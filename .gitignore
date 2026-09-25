@@ -6,4 +6,10 @@ __pycache__/
 htmlcov/
 .DS_Store
 .streamlit/secrets.toml
+data/demo/payroll_details.csv
+uploads/
+tmp_uploads/
+*.env
+.env
+.env.*
 BUILD_PROMPTS.md

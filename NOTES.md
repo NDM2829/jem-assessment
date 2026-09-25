@@ -36,3 +36,7 @@ affect hours, predictions, classifications, or evaluation.
 
 - **Site grouping:** The manager queue and its filter group employees by their registered primary site. Shift evidence shows each shift's actual site. Rationale: the register supplies one stable routing site while shifts may occur elsewhere. Effect: site-filter counts describe the employee queue, not worked hours at that site or client identity; predictions and classifications are unchanged.
 - **Data-review queue:** A current employee is marked for review when the Wednesday snapshot has an overlap, missing or cutoff-masked clock-out, invalid or ambiguous record, undated record, or no dated current shift. Alert and review groups may overlap, and every registered employee remains visible regardless of score. Rationale: uncertain recorded hours need attention even below the recall-oriented alert threshold. Effect: review counts are operational flags, not extra breaches or clean labels; no observed or estimated hours are changed.
+
+## Step 5 — deployment preparation
+
+No data assumptions were introduced or changed. The unused payroll file is excluded from the deployment tree under the existing Step 2 auxiliary-file policy. Its local raw original is retained. This packaging change has no effect on hours, predictions, classifications, or evaluation; a no-payroll demo smoke check confirms the same prediction export.
