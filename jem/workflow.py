@@ -14,7 +14,7 @@ from jem.exports import predictions_csv_bytes
 from jem.features import Snapshot, build_history, build_snapshot, source_shifts
 from jem.hours import Shift, mask_after_cutoff
 from jem.attribution import AttributionReport, allocate_overtime
-from jem.actions import Action, build_actions
+from jem.actions import Action, OPERATIONS_KINDS, REVIEW_KINDS, build_actions
 from jem.notes import RULES_VERSION, NoteClassification, classify_bundle, note_classifications_csv_bytes, note_evidence_csv_bytes
 from jem.pipeline import IngestionResult
 from jem.predictors.base import Forecast, PredictorConfig, ProcessingError
@@ -136,9 +136,17 @@ def process_bundle(ingestion: IngestionResult, policy: Policy) -> ProcessedBundl
                            note_evidence_csv_bytes(classified), attribution, actions)
 
 
-def filter_queue(processed: ProcessedBundle, primary_site_id: str | None = None) -> tuple[QueueEntry, ...]:
+def filter_queue(processed: ProcessedBundle, primary_site_id: str | None = None,
+                 status: str = "All employees", search: str = "") -> tuple[QueueEntry, ...]:
     """Keep review cases in the queue regardless of their predicted risk."""
     rows = (entry for entry in processed.queue if primary_site_id is None or entry.primary_site_id == primary_site_id)
+    if status == "Breach alerts":
+        rows = (entry for entry in rows if entry.forecast.will_breach)
+    elif status == "Records to check":
+        rows = (entry for entry in rows if entry.needs_review)
+    query = search.strip().casefold()
+    if query:
+        rows = (entry for entry in rows if query in entry.name.casefold() or query in entry.employee_id.casefold())
     return tuple(sorted(rows, key=lambda entry: (-int(entry.forecast.will_breach), -int(entry.needs_review),
                                                   -entry.forecast.risk_score, entry.employee_id)))
 
@@ -178,6 +186,11 @@ def employee_shift_rows(processed: ProcessedBundle, employee_id: str) -> tuple[d
 
 def employee_note_rows(processed: ProcessedBundle, employee_id: str) -> tuple[dict[str, str | int | bool], ...]:
     """Source notes for this employee's uniquely linked shifts through Wednesday."""
+    return current_note_rows(processed, employee_id)
+
+
+def current_note_rows(processed: ProcessedBundle, employee_id: str | None = None) -> tuple[dict, ...]:
+    """Current linked notes only; undated/unmatched notes remain in audit exports."""
     week = processed.ingestion.reporting.week_start
     if week is None:
         return ()
@@ -186,8 +199,71 @@ def employee_note_rows(processed: ProcessedBundle, employee_id: str) -> tuple[di
     rows = []
     for note in processed.note_classifications:
         shift = shift_lookup.get(note.linked_shift_id) if note.linked_shift_id else None
-        if shift and shift.employee_id == employee_id and shift.shift_date and week <= shift.shift_date < through:
+        if shift and (employee_id is None or shift.employee_id == employee_id) and shift.shift_date and week <= shift.shift_date < through:
             rows.append({"Shift ID": note.shift_id, "Source row": note.source_row or 0,
+                         "Employee ID": shift.employee_id,
+                         "Site": processed.ingestion.sites_by_id.get(shift.site_id, {}).get("site_name", shift.site_id),
                          "Note": note.note, "Category": note.category,
                          "Approval in note": note.approval_status, "Review": note.needs_review})
     return tuple(rows)
+
+
+def employee_actions(processed: ProcessedBundle, employee_id: str) -> tuple[Action, ...]:
+    """Show record corrections before allowances; preserve every supporting action."""
+    review_order = {kind: index for index, kind in enumerate((
+        "overlap", "missing_clockout", "invalid_shift", "cutoff_masked",
+        "no_current_records", "conflicting_notes"))}
+    return tuple(sorted((action for action in processed.actions
+                         if action.employee_id == employee_id and action.kind != "unmatched_note"),
+                        key=lambda action: (0 if action.kind in REVIEW_KINDS else
+                                            1 if action.kind == "breach_alert" else 2,
+                                            review_order.get(action.kind, len(review_order)),
+                                            action.kind, str(action.period_start))))
+
+
+def employee_table_rows(processed: ProcessedBundle, entries: tuple[QueueEntry, ...],
+                        view: str) -> list[dict]:
+    """One row per employee, with all required checks retained in the review view."""
+    rows = []
+    for entry in entries:
+        row = {"Employee": entry.name, "Site": entry.primary_site_name}
+        actions = employee_actions(processed, entry.employee_id)
+        if view == "Records to check":
+            checks = [action.recommendation for action in actions if action.kind in REVIEW_KINDS]
+            row.update({"What to check": "\n".join(checks or entry.review_reasons),
+                        "Breach alert": entry.forecast.will_breach})
+        else:
+            if view == "All employees":
+                row["Breach alert"] = entry.forecast.will_breach
+            row.update({"Risk": entry.forecast.risk_score * 100,
+                        "Recorded h": None if entry.snapshot.no_records else entry.snapshot.known_hours,
+                        "Records": ("No current records" if entry.snapshot.no_records else
+                                    "Suspect: overlap" if entry.snapshot.overlapping_records else
+                                    "Needs checking" if entry.needs_review else "No flag")})
+            if view == "Breach alerts":
+                row["Do today"] = actions[0].recommendation if actions else ""
+        rows.append(row)
+    return rows
+
+
+def operational_actions(processed: ProcessedBundle, *, historical: bool = False) -> tuple[Action, ...]:
+    week = processed.ingestion.reporting.week_start
+    return tuple(action for action in processed.actions if action.kind in OPERATIONS_KINDS
+                 and action.period_start is not None
+                 and (action.period_start < week if historical else
+                      week <= action.period_start <= processed.ingestion.reporting.week_end))
+
+
+def attribution_summary(processed: ProcessedBundle) -> dict:
+    """Shared historical display facts; no new allocation or cleaning policy."""
+    report = processed.attribution
+    rows = [{"Reason": label, "Hours": report.pile_hours[pile],
+             "Share": report.pile_hours[pile] / report.total_overtime_hours if report.total_overtime_hours else 0.0}
+            for pile, label in (("client_requested", "Client requested"),
+                                ("operational_associated", "Operational issues"),
+                                ("unknown", "Unknown or unattributed"))]
+    weeks = [row.week_start for row in report.allocations]
+    return {"rows": rows, "start": min(weeks) if weeks else None,
+            "end": max(weeks) + timedelta(days=6) if weeks else None,
+            "sites": tuple(sorted(report.site_summaries,
+                                  key=lambda site: (-site.operational_associated_hours, site.site_name)))}

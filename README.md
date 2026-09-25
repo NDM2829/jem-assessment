@@ -165,8 +165,8 @@ sites. These are associations, not proven causes or billable hours.
 
 Recommendations are generated from forecast alerts, current shift-quality flags
 and uniquely linked notes. Each has a reason and source file/row/key evidence.
-The **Load data & checks** view shows unresolved current records and unmatched
-notes. Employee details show their alert and record checks; **Overtime reasons**
+The **Load new data** view shows unresolved current records and unmatched
+notes. Employee details show their alert and record checks; **Why overtime**
 shows site relief patterns and current equipment/client-scope checks. Relief
 patterns mean at least two distinct shifts at one actual site in a Monday–Sunday
 period. A numeric allowance before 55 appears only for usable current recorded
@@ -177,18 +177,36 @@ sensitivity investigations are listed in `NOTES.md` and have not changed outputs
 
 ## Dashboard walkthrough
 
-1. Open **This week**. Review the reporting period, separate breach-alert and
-   data-review counts, and filter the employee queue by registered primary site.
-2. Select an employee to see the genuine risk, support/fallback, completed and
-   estimated hours, quality flags, and shifts with their actual work sites.
-3. Open **Overtime reasons** to see historical clean-week cause associations,
-   excluded coverage, actual shift sites, source-linked note actions and the note-classification download.
-   The `notes-1.0` review result and known misses are documented in `NOTES.md`.
-4. Open **Load data & checks**, choose **Replacement upload** in the sidebar,
-   then select one same-format CSV bundle. Check row counts, date coverage and
-   structured issues before pressing **Process bundle**. Inspect the unresolved
-   record checks after processing. To replace that upload,
-   click **Start a new replacement upload** first. Rejected inputs clear results.
-5. Return to **This week** to review the replacement and download its
-   `predictions.csv`. This download never overwrites the repository's original
-   `predictions.csv`.
+1. Open **Act today**. The week and Wednesday cutoff come from the export.
+   Separate counts show breach alerts and employees needing record checks, with
+   their overlap stated explicitly. The default list contains breach alerts.
+2. **Breach alerts** shows every alert in one sortable table, with the employee,
+   registered site, risk, recorded hours, record status and next action.
+   **Records to check** lists every employee needing review and all their specific
+   checks. **All employees** shows the complete register. There is no pagination;
+   site filtering and search narrow the table when needed. Downloads always
+   contain every employee.
+3. Select a table row to open the employee drill-down. Record
+   corrections appear before any remaining-hours allowance. Shifts, notes,
+   estimates and source rows are expandable. Return with **Back to employee list**.
+4. Open **Why overtime** for the historical client-requested / operational /
+   unknown hours split, the largest operational concentration and ranked actual
+   work sites. The unknown share and excluded coverage remain visible. Current
+   supervisor reports and site checks are separate from earlier relief patterns.
+   **How reliable are these reasons?** reads the saved, version-matched demo
+   review metrics and discloses the nine disagreements and review limitations;
+   it does not claim validation of uploaded notes.
+5. Open **Load new data**, select **Replacement upload**, and choose the CSVs
+   from one export. Review the automatically detected week and file checklist,
+   then select **Load dashboard**. Success returns directly to **Act today**.
+   An earlier reporting date is available in the advanced expander. Changed,
+   cleared or rejected inputs invalidate active results. Use **Choose another
+   export** to replace a processed upload; files from separate exports are not
+   combined. Uploads last only for this session.
+6. Download `predictions.csv` from **Act today** and `note_classifications.csv`
+   from **Why overtime**. These do not overwrite the repository's exports.
+
+The employee tables use the available screen width and support scrolling and
+sorting. The drill-down keeps detailed evidence in expanders. This
+presentation update retains the Step 7 predictor, classifications, hours and
+quality policy; it does not implement the pending Step 8 comparison.

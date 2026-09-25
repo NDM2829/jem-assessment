@@ -1,319 +1,437 @@
-"""Streamlit presentation for the shared Jem ingestion and prediction pipeline."""
+"""Manager-facing Streamlit views over the shared Jem workflow."""
 
 from __future__ import annotations
 
+from collections import Counter
+from datetime import timedelta
+import json
 from pathlib import Path
 
 import streamlit as st
 
-from jem.io import demo_sources
-from jem.actions import OPERATIONS_KINDS, REVIEW_KINDS, action_evidence_rows
+from jem.actions import REVIEW_KINDS, action_evidence_rows
+from jem.io import CORE_FILES, FILES, demo_sources
 from jem.pipeline import ingest
 from jem.predictors.base import ProcessingError
-from jem.workflow import ProcessedBundle, employee_note_rows, employee_shift_rows, filter_queue, input_fingerprint, load_policy, process_bundle, queue_counts, source_fingerprint
-
+from jem.workflow import (
+    ProcessedBundle, attribution_summary, current_note_rows, employee_actions,
+    employee_note_rows, employee_shift_rows, employee_table_rows, filter_queue, input_fingerprint,
+    load_policy, operational_actions, process_bundle, queue_counts, source_fingerprint,
+)
 
 ROOT = Path(__file__).resolve().parent
 POLICY_PATH = ROOT / "config" / "prediction_policy.toml"
-VIEWS = ("This week", "Overtime reasons", "Load data & checks")
+VIEWS = ("Act today", "Why overtime", "Load new data")
 
 
 def _init_session() -> None:
     defaults = {
         "uploaded_sources": {}, "upload_generation": 0, "upload_locked_source": None,
         "upload_error": None, "active_result": None, "active_token": None,
-        "selected_as_of": None, "as_of_source": None,
+        "selected_as_of": None, "as_of_source": None, "source_mode": "Bundled demo",
+        "view": "Act today", "selected_employee": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+    if "next_view" in st.session_state:
+        st.session_state.view = st.session_state.pop("next_view")
+
+
+def _go(view: str) -> None:
+    st.session_state.view = view
+    st.session_state.selected_employee = None
+
+
+def _select_employee(employee_id: str | None) -> None:
+    st.session_state.selected_employee = employee_id
+    if employee_id is None:
+        st.session_state.employee_table = {"selection": {"rows": []}}
+
+
+def _clear_result() -> None:
+    st.session_state.active_result = None
+    st.session_state.active_token = None
+    st.session_state.selected_employee = None
+    st.session_state.site_filter = "All sites"
+    st.session_state.queue_status = "Breach alerts"
+    st.session_state.employee_search = ""
+    st.session_state.employee_table = {"selection": {"rows": []}}
+
+
+def _new_upload() -> None:
+    st.session_state.upload_generation += 1
+    st.session_state.uploaded_sources = {}
+    st.session_state.upload_locked_source = None
+    st.session_state.upload_error = None
+    st.session_state.selected_as_of = None
+    st.session_state.as_of_source = None
+    _clear_result()
+
+
+def _read_upload(key: str) -> None:
+    uploaded = st.session_state[key] or []
+    _clear_result()
+    names = [item.name for item in uploaded]
+    if len(names) != len(set(names)):
+        st.session_state.upload_error = "Duplicate filenames selected. Choose another export with one file per name."
+        st.session_state.uploaded_sources = {}
+        return
+    candidate = {item.name: item.getvalue() for item in uploaded}
+    locked = st.session_state.upload_locked_source
+    if candidate and locked is not None and source_fingerprint(candidate) != locked:
+        st.session_state.upload_error = "The processed upload changed. Use Choose another export to keep exports separate."
+        st.session_state.uploaded_sources = {}
+        return
+    st.session_state.uploaded_sources = candidate
+    st.session_state.upload_error = None
 
 
 def _upload_controls() -> None:
-    st.subheader("Replacement bundle")
-    st.caption("Select the CSV files for one complete replacement export. Files stay in this browser session and are not durably stored.")
-    if st.button("Start a new replacement upload"):
-        st.session_state.upload_generation += 1
-        st.session_state.uploaded_sources = {}
-        st.session_state.upload_locked_source = None
-        st.session_state.upload_error = None
-        st.session_state.active_result = None
-        st.session_state.active_token = None
-        st.session_state.selected_as_of = None
-        st.session_state.as_of_source = None
-        st.rerun()
-    uploaded = st.file_uploader("Select same-format CSV files", type="csv", accept_multiple_files=True,
-                                key=f"bundle_upload_{st.session_state.upload_generation}")
-    if uploaded:
-        names = [item.name for item in uploaded]
-        if len(names) != len(set(names)):
-            st.session_state.upload_error = "Duplicate filenames selected. Start a new replacement upload and select one file per name."
-            st.session_state.active_result = None
-            st.session_state.active_token = None
-        else:
-            candidate = {item.name: item.getvalue() for item in uploaded}
-            candidate_id = source_fingerprint(candidate)
-            locked = st.session_state.upload_locked_source
-            if locked is not None and candidate_id != locked:
-                st.session_state.upload_error = "The processed upload changed. Start a new replacement upload so files from different selections cannot be combined."
-                st.session_state.active_result = None
-                st.session_state.active_token = None
-            else:
-                st.session_state.uploaded_sources = candidate
-                st.session_state.upload_error = None
-    if st.session_state.upload_error:
-        st.error(st.session_state.upload_error)
+    st.subheader("1. Choose CSV files")
+    st.caption("Select files from one export. Uploads and results last only for this session; download what you need before leaving.")
+    st.radio("Use data from", ("Bundled demo", "Replacement upload"), key="source_mode",
+             horizontal=True, persist_state="session")
+    if st.session_state.source_mode == "Replacement upload":
+        key = f"bundle_upload_{st.session_state.upload_generation}"
+        st.file_uploader("Select the export's CSV files", type="csv", accept_multiple_files=True,
+                         key=key, on_change=_read_upload, args=(key,))
+        if st.session_state.uploaded_sources or st.session_state.upload_error or st.session_state.upload_locked_source:
+            st.button("Choose another export", key="new_upload", on_click=_new_upload)
+        if st.session_state.upload_error:
+            st.error(st.session_state.upload_error)
 
 
-def _preview_panel(preview, *, source_name: str) -> None:
+def _preview_panel(preview) -> None:
     report = preview.reporting
-    st.subheader("Coverage and checks")
-    st.caption(f"Source: {source_name}. Row counts exclude unused payroll details and never show sensitive row contents.")
-    if preview.bundle.row_counts:
-        st.dataframe([{"File": name, "Rows": count} for name, count in preview.bundle.row_counts.items()],
-                     hide_index=True, width="stretch")
-    if report.first_shift_date and report.last_shift_date:
-        st.write(f"Shift start dates: {report.first_shift_date} to {report.last_shift_date}.")
-        st.write(f"Selected reporting week: {report.week_start} to {report.week_end}. {report.explanation}")
-        st.caption(f"Historical support indicator: {report.historical_state}. The predictor checks actual clean reference rows before scoring.")
+    if report.week_start:
+        st.write(f"**Reporting week: {report.week_start:%d %b}–{report.week_end:%d %b %Y}**")
+        st.caption(f"Export through {report.as_of:%A %d %b %Y}. {report.explanation}")
+    st.markdown("**Files received**")
+    for name in FILES:
+        if name == "payroll_details.csv":
+            continue
+        if name in preview.bundle.tables:
+            st.text(f"✓ {name} · {preview.bundle.row_counts.get(name, 0):,} rows")
+        elif name in CORE_FILES:
+            st.error(f"Missing or unreadable: {name} — required to load predictions.")
+        elif name == "shift_notes.csv":
+            st.warning("Missing or unreadable: shift_notes.csv — the explanation of why overtime happened is unavailable.")
+        else:
+            st.caption(f"Not available: {name} (supporting file)")
     errors = sum(issue.severity == "error" for issue in preview.issues)
     warnings = sum(issue.severity == "warning" for issue in preview.issues)
-    st.write(f"Checks: {errors} blocking errors, {warnings} row or coverage warnings.")
+    if errors:
+        st.error(f"Fix {errors} blocking file or column errors before loading.")
+    elif warnings:
+        st.info(f"Files can be processed with {warnings} warnings. Affected records remain flagged.")
+    else:
+        st.success("File checks passed.")
     if preview.issues:
-        st.dataframe([{"File": issue.file, "Row": issue.row, "Key": issue.key,
-                       "Severity": issue.severity, "Issue": issue.issue,
-                       "Suggested correction": issue.suggested_correction} for issue in preview.issues],
-                     hide_index=True, width="stretch")
+        with st.expander("File and record checks", expanded=bool(errors)):
+            for issue in preview.issues:
+                row = f", row {issue.row}" if issue.row is not None else ""
+                st.text(f"{issue.file}{row}: {issue.issue}. {issue.suggested_correction}")
     for message in preview.unavailable_outputs:
-        st.info(message)
+        st.warning(message)
+    if report.mode == "before_wednesday":
+        st.warning("This export ends before Wednesday. Supply data through Wednesday to produce the forecast.")
 
 
 def _load_view(preview, policy, token: str | None, source_id: str | None) -> None:
-    st.caption("Each uploaded bundle replaces the previous one. Rejected or changed inputs clear the displayed predictions.")
-    if st.session_state.source_mode == "Replacement upload":
-        if not st.session_state.uploaded_sources:
-            st.info("Select a complete replacement bundle to preview its coverage and checks.")
-            return
-        if st.session_state.upload_error:
-            return
-    if preview is None:
-        st.warning("No bundle selected.")
+    if st.session_state.upload_error and st.session_state.source_mode == "Replacement upload":
         return
-    _preview_panel(preview, source_name="Bundled synthetic demo" if st.session_state.source_mode == "Bundled demo" else "Session upload")
-    if preview.reporting.mode == "before_wednesday":
-        st.warning("This selection ends before Wednesday. A complete Wednesday forecast cannot be produced from it.")
-    if st.button("Process bundle", disabled=not preview.accepted or preview.reporting.mode in ("before_wednesday", "unavailable")):
+    if preview is None:
+        st.info("Choose an export to see its reporting week and file checks. Include employees.csv, shifts.csv, sites.csv and shift_notes.csv; add the other supplied CSVs if available.")
+        return
+    _preview_panel(preview)
+    st.subheader("3. Load dashboard")
+    st.caption("This replaces the active results. Changed or rejected inputs clear the previous predictions.")
+    if st.button("Load dashboard", key="process_bundle", type="primary",
+                 disabled=not preview.accepted or preview.reporting.mode in ("before_wednesday", "unavailable")):
         try:
-            processed = process_bundle(preview, policy)
+            with st.spinner("Preparing employee alerts and supervisor notes…"):
+                processed = process_bundle(preview, policy)
         except (ProcessingError, ValueError) as exc:
-            st.session_state.active_result = None
-            st.session_state.active_token = None
+            _clear_result()
             st.error(str(exc))
         else:
             st.session_state.active_result = processed
             st.session_state.active_token = token
             if st.session_state.source_mode == "Replacement upload":
                 st.session_state.upload_locked_source = source_id
-            st.success(f"Processed {len(processed.queue)} registered employees. Open This week to review predictions.")
-    elif st.session_state.active_result is not None and st.session_state.active_token == token:
-        st.success("This bundle is processed. Open This week to review predictions.")
+            st.session_state.next_view = "Act today"
+            st.session_state.selected_employee = None
+            st.rerun()
     processed = st.session_state.active_result
     if processed is not None and st.session_state.active_token == token:
-        review_actions = tuple(action for action in processed.actions if action.kind in REVIEW_KINDS)
-        st.subheader("Unresolved record checks")
-        st.caption("These are record-linked checks for the selected Wednesday snapshot, plus notes that cannot be linked. Overlaps retain suspect recorded sums; no interval repair was applied.")
-        if review_actions:
-            st.dataframe(action_evidence_rows(review_actions), hide_index=True, width="stretch")
-        else:
-            st.caption("No additional record-level review action was found for this selection.")
+        with st.expander("Record checks and unmatched notes"):
+            actions = tuple(action for action in processed.actions if action.kind in REVIEW_KINDS)
+            st.caption("Undated records and unmatched notes cannot be assigned to a current work site or period.")
+            if actions:
+                st.dataframe(action_evidence_rows(actions), hide_index=True, width="stretch")
+            else:
+                st.write("No unresolved record checks.")
 
 
-def _queue_table(rows) -> list[dict[str, str]]:
-    return [{"Employee": entry.name, "Site": entry.primary_site_id or "—",
-             "Risk": f"{entry.forecast.risk_score:.1%}",
-             "Status": ("Alert + review" if entry.forecast.will_breach and entry.needs_review else
-                        "Alert" if entry.forecast.will_breach else
-                        "Review" if entry.needs_review else "No alert")}
-            for entry in rows]
+def _empty_result() -> None:
+    st.warning("No predictions are active for the selected inputs. Load the export to see this week's alerts.")
+    st.button("Load new data", on_click=_go, args=("Load new data",), key="empty_load")
+
+
+def _recorded_hours(entry) -> None:
+    snapshot = entry.snapshot
+    if snapshot.no_records:
+        st.write("**Recorded hours: unavailable** — no dated shifts through Wednesday; final hours and risk are not zero.")
+    elif snapshot.overlapping_records:
+        st.write(f"**Recorded sum: {snapshot.known_hours:.2f} h — suspect** (overlapping shifts).")
+    elif entry.needs_review:
+        st.write(f"**Completed recorded hours: {snapshot.known_hours:.2f} h — records need checking.**")
+    else:
+        st.write(f"**Completed recorded hours: {snapshot.known_hours:.2f} h** through Wednesday.")
 
 
 def _employee_detail(processed: ProcessedBundle, entry) -> None:
-    snapshot = entry.snapshot
-    forecast = entry.forecast
-    st.subheader(f"{entry.name} · {entry.employee_id}")
-    st.caption(f"Queue site: {entry.primary_site_name} ({entry.primary_site_id or 'unassigned'}). Shift sites below are the places recorded for the work.")
-    st.write(f"**Decision:** {'Breach alert' if forecast.will_breach else 'No breach alert'} · "
-             f"**Risk score:** {forecast.risk_score:.1%} · **Method:** {forecast.method_version}")
-    st.write(f"Completed recorded hours by cutoff: **{snapshot.known_hours:.2f} h**. "
-             f"Estimated elapsed addition: **{snapshot.imputed_elapsed:.2f} h**. "
-             f"Estimated overnight carry: **{snapshot.carry:.2f} h**.")
+    st.button("Back to employee list", on_click=_select_employee, args=(None,))
+    st.subheader(entry.name)
+    st.caption(f"{entry.employee_id} · Registered site: {entry.primary_site_name}")
+    st.write(f"**{'Breach alert' if entry.forecast.will_breach else 'No breach alert'}** · Risk score {entry.forecast.risk_score:.1%}")
+    _recorded_hours(entry)
+    actions = employee_actions(processed, entry.employee_id)
+    if actions:
+        st.markdown("**Do today**")
+        for action in actions:
+            st.write(f"• {action.recommendation}")
+    else:
+        st.caption("No specific action was triggered by the available records. No alert does not guarantee a week below 55 hours.")
     if entry.review_reasons:
-        st.warning("Data review: " + "; ".join(entry.review_reasons) + ".")
-    else:
-        st.caption("No current shift-quality flag was found. Recorded hours remain subject to the export's completeness limits.")
-    if snapshot.overlapping_records:
-        st.caption("The completed recorded sum includes overlapping intervals and is suspect; it is not a confirmed worked-hours total or confirmed breach.")
-    if snapshot.no_records:
-        st.caption("No dated shift is recorded through Wednesday. This does not prove zero final-week hours or zero risk.")
-    st.write(f"**Historical support:** {forecast.support}. "
-             f"Fallback: {forecast.fallback or 'role and shift-pattern peers with personal history'}.")
-    st.caption("The score uses Wednesday hours and earlier completed employee-weeks. Supervisor notes may explain recorded hours; they are not inputs to this score.")
-    shift_rows = employee_shift_rows(processed, entry.employee_id)
-    st.markdown("**Shifts through Wednesday**")
-    if shift_rows:
-        st.dataframe([{"Date": row["Start date"], "Actual shift site": row["Actual shift site"],
-                       "Recorded h": row["Recorded hours"], "Status": row["Status"]} for row in shift_rows],
-                     hide_index=True, width="stretch")
-        with st.expander("Shift IDs, times and overlap flags"):
-            st.dataframe(shift_rows, hide_index=True, width="stretch")
-    else:
-        st.info("No dated shift record through Wednesday for this employee.")
-    note_rows = employee_note_rows(processed, entry.employee_id)
-    st.markdown("**Supervisor notes linked through Wednesday**")
-    if note_rows:
-        st.dataframe(note_rows, hide_index=True, width="stretch")
-        st.caption("These notes describe recorded shifts. Their categories do not enter this risk score; approval is separate from cause.")
-    else:
-        st.caption("No uniquely linked supervisor note is available through Wednesday for this employee.")
-    employee_actions = tuple(action for action in processed.actions if action.employee_id == entry.employee_id
-                             and action.kind != "unmatched_note")
-    if employee_actions:
-        st.markdown("**Recommended checks from these records**")
-        for action in employee_actions:
-            st.write(f"**{action.kind.replace('_', ' ').title()}:** {action.recommendation} {action.reason}")
-            if action.kind == "breach_alert":
-                if action.remaining_hours_before_55 is None:
-                    st.caption("Remaining-hours allowance: records need confirmation.")
-                else:
-                    st.caption(f"Remaining recorded-hours allowance before 55: {action.remaining_hours_before_55:.2f} h, based on usable shifts in this export. Estimated additions are separate above.")
-        with st.expander("Action source rows"):
-            st.dataframe(action_evidence_rows(employee_actions), hide_index=True, width="stretch")
+        st.warning("Records to check: " + "; ".join(entry.review_reasons) + ".")
+    with st.expander("Hours and shifts through Wednesday"):
+        st.write(f"Completed recorded hours: {entry.snapshot.known_hours:.2f} h. "
+                 f"Estimated elapsed addition: {entry.snapshot.imputed_elapsed:.2f} h. "
+                 f"Estimated overnight carry: {entry.snapshot.carry:.2f} h.")
+        st.caption("Estimates are not confirmed worked hours. Shift sites below show where work was recorded, which can differ from the registered site.")
+        shifts = employee_shift_rows(processed, entry.employee_id)
+        for row in shifts:
+            hours = "Unavailable" if row["Recorded hours"] is None else f'{row["Recorded hours"]:.2f} h'
+            st.text(f'{row["Start date"]} · {row["Actual shift site"]}\n{row["Shift ID"]}: {row["Clock-in"]} → {row["Clock-out at cutoff"]}\n{hours} · {row["Status"]}'
+                    + (" · Overlap flagged" if row["Overlap flagged"] else ""))
+        if not shifts:
+            st.write("No dated shift record through Wednesday.")
+    with st.expander("Supervisor notes and reasons"):
+        rows = employee_note_rows(processed, entry.employee_id)
+        for row in rows:
+            st.text(row["Note"] or "(Blank note)")
+            st.caption(f'{row["Shift ID"]} · {row["Category"].replace("_", " ")} · Approval: {row["Approval in note"]}')
+        if not rows:
+            st.write("No uniquely linked note through Wednesday.")
+        st.caption("Notes explain recorded shifts; they are not inputs to the risk score. Approval is separate from the reason for extra hours.")
+    with st.expander("Risk calculation and source evidence"):
+        st.write(f"Method: {entry.forecast.method_version}. Historical support: {entry.forecast.support}. "
+                 f"Fallback: {entry.forecast.fallback or 'role and shift-pattern peers with personal history'}.")
+        st.write("The score uses Wednesday hours and earlier completed employee-weeks. Overlaps retain their suspect sums; no repair is applied.")
+        if actions:
+            st.dataframe(action_evidence_rows(actions), hide_index=True, width="stretch")
 
 
 def _this_week(processed: ProcessedBundle | None) -> None:
-    st.title("This week")
+    st.title("Act today")
     if processed is None:
-        st.warning("No predictions are active for the selected inputs. Open Load data & checks to process this bundle.")
+        _empty_result()
         return
     report = processed.ingestion.reporting
-    first = processed.queue[0].forecast
-    st.caption(f"{report.week_start}–{report.week_end} · As of {report.as_of} · {report.mode.replace('_', ' ')} · {first.method_version}")
-    st.write(report.explanation)
-    st.info(f"Breach alerts use the fixed {first.threshold:.0%} risk threshold selected for recall from earlier forecasts. "
-            "A flagged employee is not necessarily more likely than not to breach.")
-    all_entries = processed.queue
-    sites = sorted({(entry.primary_site_id, entry.primary_site_name) for entry in all_entries}, key=lambda item: item[1])
-    options = ["All primary sites"] + [f"{name} ({identifier or 'unassigned'})" for identifier, name in sites]
-    selected_site = st.selectbox("Primary site filter", options)
-    site_map = dict(zip(options[1:], (identifier for identifier, _ in sites)))
-    ordered = filter_queue(processed, None if selected_site == "All primary sites" else site_map[selected_site])
-    employee_count, alerts, review = queue_counts(ordered)
-    left, middle, right = st.columns(3)
-    left.metric("Employees", employee_count)
-    middle.metric("Breach alerts", alerts)
-    right.metric("Data review", review)
-    st.caption("Alert = the model flags possible >55-hour final week. Review = records need checking. Both can apply. Site codes are registered primary sites; full names appear in the filter and details.")
-    st.dataframe(_queue_table(ordered), hide_index=True, width="stretch")
-    if ordered:
-        lookup = {f"{entry.name} · {entry.employee_id}": entry for entry in ordered}
-        selected = st.selectbox("Inspect an employee", list(lookup))
-        _employee_detail(processed, lookup[selected])
-    st.download_button("Download predictions.csv", data=processed.predictions_csv,
-                       file_name="predictions.csv", mime="text/csv")
-    with st.expander("Methodology and evidence"):
-        st.write("Target: final Monday–Sunday recorded hours strictly greater than 55. The forecast masks clock-outs after Thursday 00:00 South African local time; record-entry timing cannot be proven from this export. Estimated elapsed hours are kept separate from completed recorded hours.")
-        st.write(f"Method: {first.method_version}. Threshold: {first.threshold:.2f}. Policy: {processed.policy.threshold_rule}.")
-        st.write("The six-week shared-code replay matched the supplied notebook: correlated hours caught 24 of 44 eligible breaches with 137 false alerts; naive caught 23 with 260. This is exploratory replay on the same supplied export, not independent validation or performance on uncertain outcomes.")
-        st.write("Overlaps are flagged without repair. Missing or future clock-outs remain uncertain. Note categories are separate from the breach predictor. One human review sample found classification disagreements; see NOTES.md for the check and its limits.")
+    source = "Synthetic demo" if st.session_state.source_mode == "Bundled demo" else "Uploaded export"
+    st.caption(f"{report.week_start:%d %b}–{report.week_end:%d %b %Y} · Through Wed {report.week_start + timedelta(days=2):%d %b}, end of day · {source}")
+    if report.mode != "wednesday_snapshot":
+        st.info(f"Historical Wednesday forecast. {report.explanation}")
+    if st.session_state.selected_employee:
+        entry = next((row for row in processed.queue if row.employee_id == st.session_state.selected_employee), None)
+        if entry is not None:
+            _employee_detail(processed, entry)
+            return
+        st.session_state.selected_employee = None
+    sites = sorted({(entry.primary_site_id, entry.primary_site_name) for entry in processed.queue}, key=lambda item: item[1])
+    site_map = {f"{name} ({identifier or 'unassigned'})": identifier for identifier, name in sites}
+    metrics = st.container()
+    with st.expander("Filter by site or find an employee"):
+        site = st.selectbox("Registered site", ["All sites", *site_map], key="site_filter", persist_state="session")
+        query = st.text_input("Find an employee", placeholder="Name or employee ID", key="employee_search", persist_state="session")
+    site_id = site_map.get(site)
+    site_rows = filter_queue(processed, site_id)
+    employees, alerts, review = queue_counts(site_rows)
+    overlap = sum(entry.forecast.will_breach and entry.needs_review for entry in site_rows)
+    with metrics:
+        with st.container(horizontal=True, gap="small"):
+            st.metric("Breach alerts", alerts, width=120)
+            st.metric("Records to check", review, width=120)
+        st.caption(f"{employees} employees assessed · {overlap} in both groups · {site}")
+        st.caption("Alerts flag possible >55 h by Sunday, not confirmed breaches.")
+    status = st.radio("Show employees", ("Breach alerts", "Records to check", "All employees"),
+                      horizontal=True, key="queue_status", persist_state="session", label_visibility="collapsed")
+    rows = filter_queue(processed, site_id, status, query)
+    signature = (site, status, query, st.session_state.active_token)
+    if st.session_state.get("table_context") != signature:
+        st.session_state.table_context = signature
+        st.session_state.employee_table = {"selection": {"rows": []}}
+    st.caption(f"{len(rows)} employees · Select a row to view hours, notes and all actions.")
+    if not rows:
+        st.info("No employees match this selection. Try another list, site or search.")
+    else:
+        selection = st.dataframe(
+            employee_table_rows(processed, rows, status), key="employee_table",
+            hide_index=True, width="stretch", height=min(650, 38 + len(rows) * 60),
+            row_height=80 if status == "Records to check" else 60,
+            on_select="rerun", selection_mode="single-row",
+            column_config={
+                "Employee": st.column_config.TextColumn(width="medium"),
+                "Site": st.column_config.TextColumn(width="medium"),
+                "Risk": st.column_config.NumberColumn(format="%.1f%%", width="small"),
+                "Recorded h": st.column_config.NumberColumn(format="%.2f", width="small",
+                    help="Completed recorded hours through Wednesday. Check the Records column for suspect or incomplete totals; estimates are in the drill-down."),
+                "Records": st.column_config.TextColumn(width="medium"),
+                "Do today": st.column_config.TextColumn(width="large"),
+                "What to check": st.column_config.TextColumn(width="large",
+                    help="All record checks for this employee. Select the row to read the full list and supporting evidence."),
+                "Breach alert": st.column_config.CheckboxColumn(width="small"),
+            },
+        )
+        if selection.selection.rows:
+            _select_employee(rows[selection.selection.rows[0]].employee_id)
+            st.rerun()
+    with st.expander("How alerts work"):
+        st.write(f"The target is final Monday–Sunday hours strictly greater than 55. Alerts start at a {processed.policy.config.threshold:.0%} risk score to prioritise catching breaches. An alert need not mean a breach is more likely than not; scores are not proven calibrated probabilities.")
+        st.write("The forecast uses inputs through Wednesday, masking clock-outs after Thursday 00:00 South African time. Record-entry timing cannot be proven. Estimated hours remain separate from recorded hours.")
+        st.write("On the supplied six-week exploratory replay, correlated hours caught 24 of 44 eligible breaches with 137 false alerts; the naive baseline caught 23 with 260. These are not independent validation results and exclude uncertain outcomes. The Step 8 comparison is pending.")
+        st.caption(f"Method: {processed.policy.config.method_version}. Threshold policy: {processed.policy.threshold_rule}.")
+    st.download_button("Download predictions.csv", processed.predictions_csv, "predictions.csv", "text/csv")
+    st.caption("Download includes every registered employee, regardless of filters.")
 
 
-def _reasons(processed: ProcessedBundle | None, preview) -> None:
-    st.title("Overtime reasons")
+def _note_validation(rules_version: str) -> None:
+    with st.expander("How reliable are these reasons?"):
+        path = ROOT / "analysis" / "evidence" / "note_validation_notes-1.0.json"
+        evidence = json.loads(path.read_text()) if path.exists() else {}
+        if evidence.get("status") != "reviewed" or evidence.get("rules_version") != rules_version:
+            st.write("No matching completed review evidence is available for this rules version.")
+            return
+        for key, label in (("random_validation", "Random sample"), ("targeted_challenge", "Separate challenge sample")):
+            result = evidence["splits"][key]
+            st.write(f"**{label}: {result['accuracy']:.0%} agreement** across {result['matched_reviewed']} notes.")
+        st.write("The saved review used the original demo notes, not this session's uploaded notes. Rules stayed frozen after review. One reviewer supplied labels; the review process was not independently observed. The random sample excluded the notebook's 170 reference notes; the challenge set is not a population estimate.")
+        st.write("Nine labels disagreed: five approval-only notes were treated as client requests by the reviewer; three spelling variants were missed; one possible name was matched as ‘client’. Approval alone does not establish a request. These ambiguities can change the split.")
+
+
+def _note_actions(processed: ProcessedBundle, *, historical: bool = False) -> None:
+    actions = operational_actions(processed, historical=historical)
+    if not actions:
+        st.write("No source notes met the action rules for this period.")
+        return
+    for site_id in sorted({action.site_id for action in actions}):
+        site = processed.ingestion.sites_by_id.get(site_id, {}).get("site_name", site_id)
+        group = tuple(action for action in actions if action.site_id == site_id)
+        with st.expander(f"{site} · {len(group)} checks"):
+            for action in group:
+                st.write(f"**{action.recommendation}**")
+                st.text(action.reason)
+                st.caption(f"Period: {action.period_start}–{action.period_end}")
+            st.dataframe(action_evidence_rows(group), hide_index=True, width="stretch")
+
+
+def _reasons(processed: ProcessedBundle | None) -> None:
+    st.title("Why overtime")
     if processed is None:
-        st.warning("No processed results are active for the selected inputs. Open Load data & checks to process this bundle.")
+        _empty_result()
         return
     if "shift_notes.csv" not in processed.ingestion.bundle.tables or any(
-        message.startswith("Note classification unavailable") for message in processed.ingestion.unavailable_outputs):
-        st.warning("No usable shift_notes.csv was supplied. Note classifications and cause association are unavailable.")
+        message.startswith("Note classification unavailable") for message in processed.ingestion.unavailable_outputs
+    ):
+        st.warning("No usable shift_notes.csv was supplied. The explanation of why overtime happened is unavailable. Load an export including supervisor notes.")
         return
     report = processed.attribution
-    st.caption(f"Rules: {report.rules_version}. {len(processed.note_classifications)} source notes classified; original text is preserved in the download.")
-    st.info("A human review sample found classification disagreements; the rules remain unchanged after that review. Hours below are associated with note categories, not proven causes or billable hours. Approval is separate from cause.")
-    st.write(f"Completed clean historical employee-weeks included: **{report.eligible_employee_weeks}**. "
-             f"Excluded historical employee-weeks: **{report.excluded_employee_weeks}**. "
-             "The selected reporting week's partial notes are excluded from these hour totals.")
-    if report.exclusion_reasons:
-        with st.expander("Excluded coverage reasons"):
-            st.dataframe([{"Reason": reason, "Employee-weeks": count} for reason, count in report.exclusion_reasons.items()],
-                         hide_index=True, width="stretch")
-    st.subheader("Historical overtime association")
-    st.dataframe([{"Association": label, "Hours": report.pile_hours[pile],
-                   "Share of all allocated overtime": report.pile_hours[pile] / report.total_overtime_hours if report.total_overtime_hours else 0.0}
-                  for pile, label in (("client_requested", "Client requested"),
-                                      ("operational_associated", "Operational associated"),
-                                      ("unknown", "Unknown or unattributed"))], hide_index=True, width="stretch")
-    st.caption(f"Denominator: {report.total_overtime_hours:.2f} recorded overtime hours in eligible historical weeks, including shifts with no note. Ordinary hours are assigned to the first 45 recorded hours in each employee-week.")
-    st.subheader("Actual shift sites")
-    st.dataframe([{"Site": site.site_name, "Site ID": site.site_id,
-                   "Recorded hours": site.recorded_hours, "Overtime hours": site.total_overtime_hours,
-                   "Client requested": site.client_requested_hours,
-                   "Operational associated": site.operational_associated_hours,
-                   "Unknown or unattributed": site.unknown_hours}
-                  for site in report.site_summaries], hide_index=True, width="stretch")
-    operational_actions = tuple(action for action in processed.actions if action.kind in OPERATIONS_KINDS)
-    st.subheader("Checks suggested by source notes")
-    st.caption("Relief patterns use distinct shifts at the actual site in one Monday–Sunday period. Current-week note checks stop at Wednesday; earlier completed periods are shown separately from the historical overtime totals above.")
-    if operational_actions:
-        st.dataframe([{"Type": action.kind.replace("_", " ").title(),
-                       "Actual site ID": action.site_id or "", "Period": str(action.period_start),
-                       "Recommendation": action.recommendation, "Reason": action.reason,
-                       "Source records": ", ".join(f"{source.file} row {source.row} ({source.key})" for source in action.sources)}
-                      for action in operational_actions], hide_index=True, width="stretch")
-        with st.expander("Operational action source rows"):
-            st.dataframe(action_evidence_rows(operational_actions), hide_index=True, width="stretch")
+    summary = attribution_summary(processed)
+    st.subheader("Overtime in completed weeks")
+    if summary["start"]:
+        st.caption(f'{summary["start"]:%d %b}–{summary["end"]:%d %b %Y} · This week’s partial hours are excluded.')
+    if report.total_overtime_hours:
+        for row in summary["rows"]:
+            st.write(f'**{row["Reason"]}: {row["Hours"]:,.2f} h ({row["Share"]:.1%})**')
+        st.bar_chart(summary["rows"], x="Reason", y="Hours", horizontal=True, sort=False, height=210)
+        st.write(f'**{summary["rows"][2]["Share"]:.1%} of overtime has no attributable cause.** Missing or inconclusive notes remain unknown.')
     else:
-        st.caption("No source note met the current operational action rules.")
-    st.download_button("Download note_classifications.csv", data=processed.note_classifications_csv,
-                       file_name="note_classifications.csv", mime="text/csv")
-    with st.expander("Classification evidence for reviewers"):
-        st.caption("Separate audit columns include original and matching text, typo corrections, linked shift, request and approval evidence, review flags and rules version.")
-        st.download_button("Download note evidence CSV", data=processed.note_evidence_csv,
-                           file_name="note_classification_evidence.csv", mime="text/csv")
-    st.caption("This week's notes appear in employee details through Wednesday. They do not explain the correlated-hours risk score.")
+        st.info("No overtime hours are available in eligible completed weeks. There is no historical split to estimate from this export.")
+    st.caption(f"Associated with supervisor notes; not proven causes or billable hours. Includes {report.eligible_employee_weeks} clean employee-weeks; excludes {report.excluded_employee_weeks}. Client approval and explicit requests are distinct.")
+    if summary["sites"] and summary["sites"][0].operational_associated_hours > 0:
+        top = summary["sites"][0]
+        st.write(f"**{top.site_name} has the largest operational-associated total: {top.operational_associated_hours:,.2f} h.**")
+    with st.expander("Where operational overtime is concentrated"):
+        for index, site in enumerate(summary["sites"], 1):
+            st.write(f"**{index}. {site.site_name} — {site.operational_associated_hours:,.2f} operational hours**")
+            st.caption(f"Client requested: {site.client_requested_hours:,.2f} h · Unknown: {site.unknown_hours:,.2f} h · Total overtime: {site.total_overtime_hours:,.2f} h")
+        st.caption("These are actual shift sites. Totals describe included historical records, not this week's employee queue.")
+    st.subheader("This week's supervisor reports")
+    st.caption(f"Week of {processed.ingestion.reporting.week_start:%d %b %Y}, through Wednesday. Reports describe recorded shifts, not the cause of a prediction.")
+    notes = current_note_rows(processed)
+    counts = Counter(row["Category"] for row in notes)
+    if counts:
+        with st.expander(f"Browse {len(notes)} linked notes and their reasons"):
+            for category, count in counts.most_common():
+                st.write(f"{category.replace('_', ' ').capitalize()}: {count} notes")
+            selected = st.selectbox("Read a supervisor note", range(len(notes)),
+                                    format_func=lambda i: f'{notes[i]["Shift ID"]} · {notes[i]["Site"]} · row {notes[i]["Source row"]}')
+            note = notes[selected]
+            st.text(note["Note"] or "(Blank note)")
+            st.caption(f'Reason: {note["Category"].replace("_", " ")} · Approval: {note["Approval in note"]}')
+    else:
+        st.write("No uniquely linked supervisor notes through Wednesday.")
+    st.markdown("**Checks to make today, by actual work site**")
+    _note_actions(processed)
+    with st.expander("Earlier relief patterns"):
+        st.caption("Historical patterns are kept separate from today's checks. Repeated reports are not proof of misconduct.")
+        _note_actions(processed, historical=True)
+    _note_validation(report.rules_version)
+    with st.expander("Coverage, allocation and reviewer evidence"):
+        st.write("Overtime is allocated after the first 45 recorded hours of each clean completed employee-week, in shift order. No-note shifts remain in the denominator. Excluded weeks are not treated as zero overtime.")
+        for reason, count in report.exclusion_reasons.items():
+            st.write(f"{reason.replace('_', ' ')}: {count} employee-weeks (reasons may overlap)")
+        st.caption(f"Rules: {report.rules_version}. All {len(processed.note_classifications)} original source notes remain in the download, including unmatched notes.")
+        st.download_button("Download note evidence CSV", processed.note_evidence_csv, "note_classification_evidence.csv", "text/csv")
+    st.download_button("Download note_classifications.csv", processed.note_classifications_csv, "note_classifications.csv", "text/csv")
 
 
 def main() -> None:
-    st.set_page_config(page_title="Jem overtime early warning", page_icon="⏱️")
     _init_session()
+    table_view = st.session_state.view == "Act today" and not st.session_state.selected_employee
+    st.set_page_config(page_title="Jem overtime early warning", page_icon="⏱️",
+                       layout="wide" if table_view else "centered")
+    st.html("<style>[data-testid='stMainBlockContainer'] {padding-top: 3.5rem; padding-bottom: 2rem;}</style>")
     policy = load_policy(POLICY_PATH)
-    view = st.sidebar.radio("View", VIEWS, key="view")
-    st.sidebar.radio("Data source", ("Bundled demo", "Replacement upload"), key="source_mode")
-    st.sidebar.title("Jem overtime early warning")
-    st.sidebar.caption("Uploads are kept only in this browser session.")
-    if view == "Load data & checks":
-        st.title("Load data & checks")
-    if view == "Load data & checks" and st.session_state.source_mode == "Replacement upload":
+    view = st.radio("Navigate", VIEWS, key="view", horizontal=True, label_visibility="collapsed",
+                    on_change=_select_employee, args=(None,))
+    if view == "Load new data":
+        st.title("Load new data")
         _upload_controls()
     sources = demo_sources(ROOT) if st.session_state.source_mode == "Bundled demo" else st.session_state.uploaded_sources
     preview = None
     token = None
     source_id = None
-    if sources and not st.session_state.upload_error:
+    if sources and (st.session_state.source_mode == "Bundled demo" or not st.session_state.upload_error):
         source_id = source_fingerprint(sources)
         default_preview = ingest(sources)
         if st.session_state.as_of_source != source_id:
             st.session_state.as_of_source = source_id
             st.session_state.selected_as_of = default_preview.reporting.as_of
-        if view == "Load data & checks" and default_preview.reporting.as_of is not None:
-            st.session_state.selected_as_of = st.date_input("Reporting as-of date", value=st.session_state.selected_as_of,
-                                                             key=f"as_of_{source_id[:12]}")
+        if view == "Load new data":
+            st.subheader("2. Review detected week")
+            if default_preview.reporting.as_of is not None:
+                with st.expander("Advanced: replay an earlier reporting week"):
+                    st.session_state.selected_as_of = st.date_input("Reporting as-of date", value=st.session_state.selected_as_of,
+                                                                   key=f"as_of_{source_id[:12]}")
         as_of = st.session_state.selected_as_of
         preview = ingest(sources, as_of=as_of)
         if as_of is not None:
             token = input_fingerprint(sources, as_of, policy)
     if token != st.session_state.active_token:
-        st.session_state.active_result = None
-        st.session_state.active_token = None
+        _clear_result()
     if st.session_state.source_mode == "Bundled demo" and preview is not None and preview.accepted and st.session_state.active_result is None:
         try:
             st.session_state.active_result = process_bundle(preview, policy)
@@ -321,10 +439,10 @@ def main() -> None:
         except (ProcessingError, ValueError) as exc:
             st.error(f"Demo processing failed: {exc}")
     processed = st.session_state.active_result
-    if view == "This week":
+    if view == "Act today":
         _this_week(processed)
-    elif view == "Overtime reasons":
-        _reasons(processed, preview)
+    elif view == "Why overtime":
+        _reasons(processed)
     else:
         _load_view(preview, policy, token, source_id)
 

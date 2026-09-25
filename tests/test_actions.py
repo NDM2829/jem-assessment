@@ -80,6 +80,10 @@ def test_usable_recorded_hours_allow_numeric_allowance():
     n = next(action for action in actions if action.kind == "breach_alert" and action.employee_id == "N")
     assert e.recorded_hours == 17 and e.remaining_hours_before_55 == 38
     assert n.remaining_hours_before_55 is None
+    assert "38.00 h left before 55" in e.recommendation
+    assert "17.00 recorded hours" in e.recommendation
+    assert "Confirm the export is complete" in e.recommendation
+    assert "flagged shift records" in n.recommendation
 
 
 def test_shared_export_produces_both_original_outputs(tmp_path):

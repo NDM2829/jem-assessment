@@ -89,7 +89,16 @@ def build_actions(ingestion: IngestionResult, shifts: tuple[Shift, ...],
                       f"{snapshot.carry:.2f} estimated carry hours at Wednesday cutoff.")
             reason += (" Recorded shifts support an allowance to 55 hours, subject to export completeness."
                        if usable else " Records need confirmation before any numeric remaining-hours allowance.")
-            actions.append(Action("breach_alert", "Check recorded hours and confirm any remaining assignments before the week ends.",
+            if allowance is None:
+                recommendation = "Confirm the flagged shift records before deciding how much more work to assign this week."
+            elif snapshot.known_hours > BREACH_HOURS:
+                recommendation = (f"Recorded hours already exceed 55 ({snapshot.known_hours:.2f} h). "
+                                  "Confirm the total and review remaining assignments with the site supervisor today.")
+            else:
+                recommendation = (f"Check remaining assignments against the {allowance:.2f} h left before 55 "
+                                  f"based on {snapshot.known_hours:.2f} recorded hours. "
+                                  "Confirm the export is complete before using this allowance.")
+            actions.append(Action("breach_alert", recommendation,
                                   reason, employee_records or (employee_sources[snapshot.employee_id],),
                                   employee_id=snapshot.employee_id, period_start=week, period_end=week + timedelta(days=6),
                                   recorded_hours=snapshot.known_hours, estimated_elapsed_hours=snapshot.imputed_elapsed,
@@ -103,21 +112,21 @@ def build_actions(ingestion: IngestionResult, shifts: tuple[Shift, ...],
 
     for shift, source in current:
         if shift.missing_clockout:
-            actions.append(Action("missing_clockout", "Confirm the clock-out on the source shift record.",
+            actions.append(Action("missing_clockout", f"Confirm the missing clock-out for shift {shift.shift_id} on {shift.shift_date}.",
                                   f"Shift {shift.shift_id} started on {shift.shift_date} and has a blank clock-out.",
                                   (source,), shift.employee_id, shift.site_id, shift.shift_date, shift.shift_date,
                                   recorded_hours=shift.recorded_hours))
         if shift.invalid_time or shift.excluded_reason:
-            actions.append(Action("invalid_shift", "Correct or confirm the shift time or identifier in the source export.",
+            actions.append(Action("invalid_shift", f"Correct or confirm the time or identifier for shift {shift.shift_id} on {shift.shift_date}.",
                                   f"Shift {shift.shift_id} on {shift.shift_date} has an invalid or ambiguous time/ID; its duration is not confirmed.",
                                   (source,), shift.employee_id, shift.site_id, shift.shift_date, shift.shift_date))
         if shift.end_at and shift.end_at > cutoff and not shift.excluded_reason:
-            actions.append(Action("cutoff_masked", "Confirm the eventual clock-out separately from the Wednesday forecast.",
+            actions.append(Action("cutoff_masked", f"Confirm the eventual clock-out for shift {shift.shift_id} ({shift.shift_date}); its end is beyond the Wednesday cutoff.",
                                   f"Shift {shift.shift_id} on {shift.shift_date} ends after Thursday 00:00 and was masked at the cutoff.",
                                   (source,), shift.employee_id, shift.site_id, shift.shift_date, shift.shift_date))
     for shift, source in zip(shifts, shift_sources):
         if shift.shift_date is None:
-            actions.append(Action("invalid_shift", "Correct or confirm this shift's date in the source export.",
+            actions.append(Action("invalid_shift", f"Correct or confirm the date for shift {shift.shift_id} before relying on this employee's hours.",
                                   f"Shift {shift.shift_id} has no valid start date and cannot be assigned to a reporting week.",
                                   (source,), shift.employee_id, shift.site_id))
 
@@ -125,7 +134,7 @@ def build_actions(ingestion: IngestionResult, shifts: tuple[Shift, ...],
         left, right = unique_shift_sources.get(pair.shift_id_left), unique_shift_sources.get(pair.shift_id_right)
         if left is None or right is None or (left.shift_date < week and right.shift_date < week):
             continue
-        actions.append(Action("overlap", "Confirm the two shift intervals before relying on their summed hours.",
+        actions.append(Action("overlap", f"Confirm overlapping shifts {left.key} and {right.key} before relying on their summed hours.",
                               f"Shift IDs {left.key} and {right.key} overlap by {pair.overlap_hours:.2f} hours; the recorded sum is suspect.",
                               (left, right), employee_id=pair.employee_id,
                               period_start=min(left.shift_date, right.shift_date),

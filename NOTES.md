@@ -65,3 +65,14 @@ No data assumptions were introduced or changed. The unused payroll file is exclu
 
 1. Compare keeping the longer overlapping shift with taking the union of its intervals, using the same flagged source pairs. Report changes to hours, alerts and eligible evaluation cases separately; neither alternative is a verified ground-truth correction.
 2. Artificially hide known historical clock-outs and compare personal mean, personal median and peer-blended duration estimates against those held-out durations. Keep these estimates separate from observed hours, then report any effect on forecasts and evaluation before proposing a versioned policy change.
+
+
+## Step 7 — manager dashboard simplification
+
+- **Presentation and action ordering:** The original default view showed breach alerts in pages of five (**pagination superseded by the table revision below**); record-check and all-employee lists remain available, and filters never restrict the prediction export. Employee actions put overlaps, missing clock-outs, invalid records and cutoff-masked ends ahead of a recorded-hours allowance. Rationale: a manager should see the record correction needed before relying on an hours total. Effect: presentation and recommendation wording change; calculated hours, risk scores, breach decisions, classification rules and evaluation do not. The existing allowance eligibility and registered-primary-site grouping policies are unchanged; a zero allowance is not by itself a confirmed breach.
+- **Period and validation display:** Current site checks are restricted to the selected week's existing actions; earlier relief patterns are displayed separately. The historical split retains unknown hours and excluded coverage, and review metrics are shown only for the matching saved rules version, explicitly as evidence from the original demo sample. Rationale: historical reports and prior human review must not be represented as new current-week findings or validation of an uploaded export. Effect: no new cause attribution, data cleaning or evaluation assumption is introduced.
+
+
+## Step 7 — employee tables revision
+
+- **Presentation supersedes card pagination:** Breach alerts, records to check and all employees now each show their full filtered set in one selectable table. The review table retains all record-check recommendations for each employee; selecting a row opens the existing drill-down. Rationale: managers need to compare employees and checks without paging through cards. Effect: display only; predictions, recorded hours, classifications, evaluation, site grouping and export coverage are unchanged. No data assumptions were added or changed.
