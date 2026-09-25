@@ -16,10 +16,9 @@ class ProjectStatus:
 
 
 CURRENT_STATUS = ProjectStatus(
-    stage="Step 1 — runnable shell",
+    stage="Step 2 — CSV ingestion and validation",
     shell_ready=True,
-    ingestion_ready=False,
+    ingestion_ready=True,
     predictions_ready=False,
     note_classification_ready=False,
 )
-
