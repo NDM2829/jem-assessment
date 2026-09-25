@@ -1,0 +1,29 @@
+policy_version = "1.0"
+declared_at_stage = 1
+initial_method = "correlated_hours"
+initial_method_implementation_stage = 3
+comparison_stage = 8
+
+[comparison]
+statistical_candidates = [
+  "correlated_hours",
+  "smoothed_risk_table",
+  "matched_historical_remaining_hours",
+]
+baseline = "naive"
+primary_metric = "pooled_chronological_f2"
+parameter_search = false
+new_model_families = false
+
+[comparison.tie_break]
+order = [
+  "higher_recall",
+  "fewer_false_alerts",
+  "fewer_total_alerts",
+  "method_name",
+]
+
+[reporting]
+show_baseline_even_if_disappointing = true
+show_limitations = true
+
