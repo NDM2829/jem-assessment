@@ -16,9 +16,9 @@ class ProjectStatus:
 
 
 CURRENT_STATUS = ProjectStatus(
-    stage="Step 2 — CSV ingestion and validation",
+    stage="Step 3 — hours and correlated-hours prediction",
     shell_ready=True,
     ingestion_ready=True,
-    predictions_ready=False,
+    predictions_ready=True,
     note_classification_ready=False,
 )

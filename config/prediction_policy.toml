@@ -27,3 +27,15 @@ order = [
 show_baseline_even_if_disappointing = true
 show_limitations = true
 
+[deployment]
+method_version = "correlated-hours-1.0"
+threshold = 0.05
+threshold_rule = "earlier eligible out-of-time forecasts; grid 0.00..1.00 by 0.01; max F2, then fewer false alerts, then higher threshold"
+threshold_source_weeks = "2026-06-15..2026-08-03"
+threshold_source_eligible_rows = 1475
+threshold_set_for_week = "2026-08-10"
+strict_cutoff = "Thursday 00:00 Africa/Johannesburg"
+personal_prior_weeks = 4.0
+peer_minimum_weeks = 10
+variance_floor = 1.0
+correlation_cap = 0.95

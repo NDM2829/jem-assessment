@@ -1,0 +1,26 @@
+{
+  "employee_count": 213,
+  "forecast_cutoff": "Thursday 00:00 Africa/Johannesburg",
+  "future_clockouts_masked": 12,
+  "input_sha256": {
+    "employees.csv": "c90212f2c95e99c254a49fa8ff036e7e3fa61208c399a6899cfad4af70feca71",
+    "payroll_details.csv": "a6d962ea9216cb37249a0c78565bece9db4ffb6d0496f386064d34c78cba771e",
+    "public_holidays.csv": "b73f1017c29984b89304994d9f68be3c14dacfac05163d7b7e2004cd9da6444f",
+    "shift_notes.csv": "328434f24feacdf6f2d4b14ea2e2c3f7cf20e6a9901a1d4da5dc604527477eac",
+    "shifts.csv": "2cc3f72c7d9c52f05cb32863a677663d65e353fc70011c74eeb440a84943de4f",
+    "sites.csv": "abbd7c1b650a4e17f188fa52f28dffecfd42c9c125c285197a0b2aa8cbbdcbd6",
+    "weekly_summary.csv": "d20a9b25e0de7c0e0a76e126495ddb9c0386ec8e138e70a4d747b2f9c5b12a25"
+  },
+  "limitations": "Overlap-affected sums are suspect, not confirmed worked hours or confirmed breaches. Stage 3 prediction only; note validation and other assessment outputs remain pending.",
+  "method_version": "correlated-hours-1.0",
+  "overlap_flagged_employees": 8,
+  "policy_version": "1.0",
+  "reporting_mode": "wednesday_snapshot",
+  "reporting_week_end": "2026-08-16",
+  "reporting_week_start": "2026-08-10",
+  "threshold": 0.05,
+  "threshold_rule": "earlier eligible out-of-time forecasts; grid 0.00..1.00 by 0.01; max F2, then fewer false alerts, then higher threshold",
+  "threshold_source_eligible_rows": 1475,
+  "threshold_source_weeks": "2026-06-15..2026-08-03",
+  "unavailable_clockout_records": 3
+}

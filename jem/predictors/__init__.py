@@ -1,0 +1,1 @@
+"""Interchangeable forecast adapters."""
