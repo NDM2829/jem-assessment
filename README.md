@@ -1,214 +1,38 @@
 # Jem overtime early warning
 
-This repository is being built in ordered assessment stages. The current
-deliverable is **Step 8**: the predeclared four-approach comparison and selected correlated-hours deployment, alongside source-linked manager actions, note classification and historical overtime association. It opens the
-bundled synthetic export by default, accepts a replacement CSV bundle, and
-offers predictions and note-classification downloads.
+A Streamlit ops dashboard for the synthetic [assessment brief](ASSESSMENT.md). It lists Wednesday breach alerts, records to check and every registered employee; each row opens source-linked hours, notes and manager actions. **The supplied hosted URL could not be verified from this environment**, so no live-dashboard link is asserted here.
 
-The supplied `ASSESSMENT.md` and reference notebooks are preserved as source
-material. The demo export loads through `jem.pipeline.ingest_demo`. The unused
-payroll CSV remains in the local raw originals but is excluded from the Git
-deployment tree; the loader accepts its absence and never reads its contents.
+## Run and load data
 
-## Runtime
-
-- Python 3.10.4 (the installed local interpreter reused for this project)
-- Streamlit 1.64.0
-
-For Streamlit Community Cloud, select **Python 3.10** in Advanced settings so
-deployment uses the same Python minor version as local development. The local
-patch version is recorded in `.python-version`. Runtime packages are pinned in
-`requirements.txt`; `requirements-dev.txt` is for local tests only.
-Python 3.10 remains supported for this deployment but is scheduled to reach
-end of life in October 2026. Recheck Cloud support and test a Python upgrade
-before a deployment after that date.
-
-## Streamlit Community Cloud deployment
-
-After committing and pushing this preparation to GitHub, sign in to
-[Streamlit Community Cloud](https://share.streamlit.io/) and connect the GitHub
-account with access to the repository. Create an app from an existing GitHub
-repository with these settings:
-
-| Setting | Value |
-| --- | --- |
-| Repository | `NDM2829/jem-assessment` |
-| Branch | `main` |
-| Main file path | `app.py` |
-| Python version (Advanced settings) | `3.10` |
-| Dependencies | Root `requirements.txt` (automatically detected) |
-
-The repository is currently **private**. Authorize Community Cloud to access
-this private repository. Decide whether the deployed app should remain private
-(and invite reviewers) or be public; the app's visibility is a separate
-setting. Community Cloud currently permits one private app per account. No
-secrets are needed, and the free Community Cloud service is
-sufficient. Check the deployed app yourself before sharing its generated URL;
-no public URL has been verified here. See the official [deployment guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy),
-[dependency guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/app-dependencies),
-and [sharing guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/share-your-app).
-
-The published demo includes the six CSV files used by the application. The
-unused `payroll_details.csv` is ignored and absent from the current Git tree;
-the raw original is unchanged on the local machine. Because the file was
-previously tracked, it remains in prior Git history. Keep the repository
-private unless that history has been reviewed before a visibility change.
-Notebook files may stay in the repository as references, but the app neither
-imports nor executes them. Runtime paths resolve from the repository files,
-so the demo opens without uploads.
-
-Uploads and processed results live only in the active Streamlit session. They
-are lost on browser refresh, a new tab, server restart or host hibernation;
-the demo reloads on a fresh session. Community Cloud may hibernate an app after
-12 hours without traffic and wake it on a visit. Uploaded data is not durably
-stored; download anything needed before ending the session. See Streamlit's
-[session-state](https://docs.streamlit.io/develop/api-reference/caching-and-state/st.session_state)
-and [app-management](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app)
-documentation.
-
-## Install and run locally
-
-From the repository root:
+Use Python 3.10 (`.python-version`); dependencies are pinned. From the repository root:
 
 ```bash
-/Library/Frameworks/Python.framework/Versions/3.10/bin/python3 -m venv .venv
+python3.10 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
 python -m streamlit run app.py
 ```
 
-Open the local URL printed by Streamlit (normally `http://localhost:8501`).
+The bundled synthetic export opens by default. For a later same-format export, open **Load new data → Replacement upload**, select the CSV files from *one* export (`employees.csv`, `shifts.csv`, `sites.csv`, `shift_notes.csv`; holidays and weekly summary are optional), check the detected week, then choose **Load dashboard**. Use **Choose another export** before replacing a processed upload. The dashboard offers `predictions.csv` and `note_classifications.csv` downloads. Missing notes leave the cause view unavailable; a bundle missing a core file is rejected. Uploads and results are held only in the current Streamlit session, not saved on the server; download outputs before refresh, a new tab or server restart. The repository-root CSVs always represent the original supplied export, not a browser upload. A [labelled synthetic replacement check](evidence/upload_replay.md) demonstrates the week, roster, notes and downloads changing without code edits.
 
-Run the current checks with:
+## Reproduce outputs and checks
 
 ```bash
 source .venv/bin/activate
-python -m pytest
+python scripts/export_assessment.py
+python scripts/evaluate.py
+python scripts/evaluate_notes.py --review evidence/note_validation_review_completed.csv
+python -m pytest -q -p no:cacheprovider
 ```
 
-## Current architecture
+`export_assessment.py` recreates the two required root CSVs and `predictions_manifest.json` from `data/demo/`. For a separate export without replacing the root files, use `python scripts/export_assessment.py --data-dir PATH --output-dir OUTPUT_DIR`. The evaluation report is [step8_comparison.json](analysis/evidence/step8_comparison.json); the [selected-method explanation](analysis/SELECTED_METHOD.md) includes thresholds, calibration and review budgets. The completed note labels and [metrics](analysis/evidence/note_validation_notes-1.0.json) reproduce the disclosed one-reviewer check. A [five-minute video checklist](evidence/video_checklist.md) covers the live walkthrough; no video link has been supplied.
 
-- `app.py`: presentation-only Streamlit entrypoint
-- `jem/io.py`: shared lossless CSV reader for demo paths, upload objects and export scripts
-- `jem/pipeline.py`: validation, safe unique-ID lookups and reporting context
-- `jem/hours.py`, `jem/features.py`: strict Wednesday snapshots and separate observed outcomes
-- `jem/predictors/`: correlated hours, smoothed risk table, matched remainder and naive hours comparator
-- `jem/evaluation.py`, `jem/comparison.py`: chronological threshold selection and common four-approach replay
-- `jem/exports.py`, `scripts/export_assessment.py`: checked submission CSVs and prediction manifest
-- `jem/workflow.py`: session-safe processing, queue facts and current shift evidence
-- `jem/notes.py`, `jem/attribution.py`: versioned note rules and clean historical overtime association
-- `jem/actions.py`: deterministic recommendations with source file, row and key evidence
-- `jem/note_evaluation.py`: exact-text human-review metrics, separate by sample split
-- `config/prediction_policy.toml`: predeclared selection policy and frozen selected deployment
-- `tests/`: focused automated checks
+## How it works
 
-There is no React app, API server, database, container, chatbot, authentication
-system, paid service, or API key. Prediction and hours logic must remain outside
-the UI as later stages add it.
+`jem/io.py` and `jem/pipeline.py` validate a bundle; `jem/hours.py` and `jem/features.py` build Wednesday snapshots and separate clean outcomes. `jem/predictors/` scores the fixed statistical candidates; `jem/workflow.py` supplies the selected predictor, full employee queue and app/export parity. `jem/notes.py`, `jem/attribution.py` and `jem/actions.py` provide source-linked reasons and operational checks. `jem/comparison.py` runs the chronological common replay. `app.py` presents these shared results without calculating predictions or hours.
 
-## Current limitations
+The selected deployment is **correlated hours**, with a fixed **0.05** alert threshold in [config](config/prediction_policy.toml). Earlier completed clean history may refresh its reference statistics on a new upload; the method and threshold do not change until explicit offline re-evaluation. On the reused six-week synthetic replay, it caught **24/44** eligible breaches with **137** false alerts (F2 **0.356**); the naive Wednesday-hours × 7/3 baseline caught **23/44** with **260** false alerts (F2 **0.251**). Another **171** employee-weeks had uncertain outcomes and were excluded from confusion counts. These weeks informed method development, so this is a shared-implementation check, not independent evidence of future accuracy. Scores are historical statistical estimates, not proven calibrated probabilities. Overlap sums remain suspect and missing records are not zero-risk evidence. Note reasons are associations, not confirmed causes or billable hours. See [NOTES.md](NOTES.md) and the full [assumption history](evidence/assumption_log.md).
 
-The dashboard displays current-week hours, predictions, quality flags, source
-note classifications, historical overtime association and record-linked actions. Human note validation
-has been completed for `notes-1.0` on one sheet prepared without classifier
-labels; the review process itself was not independently observed. Known misses
-are reported in `NOTES.md`, and the rules were left unchanged after review.
-The supplied notebook's AI-reference agreement is not human accuracy. The completed Step 8 comparison selected correlated hours by the predeclared pooled F2 rule. Its 0.05 threshold remains fixed; `analysis/SELECTED_METHOD.md` gives the evidence and limits. `ingest` accepts a replacement mapping of filenames to paths,
-bytes or browser file objects. Each call is isolated; callers should discard
-old results when a replacement is rejected. Row counts exclude payroll because
-its contents are deliberately unread. The reporting context gives the first
-and last valid shift dates, selected week, snapshot mode and historical fallback
-state. Browser uploads and their results live only in the current Streamlit
-session; they are not durably stored. A changed upload must be started as a new
-replacement bundle. Filter changes reuse the processed result. Input, reporting
-date and policy changes invalidate it; replacement uploads require processing
-again. Browser downloads are generated in memory and do not change the root
-assessment export.
+## Publishing status
 
-Run `python scripts/export_assessment.py` to regenerate both root assessment
-CSVs, `predictions.csv` and `note_classifications.csv`, and the
-`predictions_manifest.json` from the bundled synthetic export. The prediction CSV contains
-exactly `employee_id,will_breach,risk_score`. The manifest records input hashes,
-the reporting week, cutoff, fixed threshold, method version and quality counts.
-The fixed threshold is 0.05, re-derived from 1,475 earlier eligible out-of-time
-forecasts before the original current-week cutoff. Run `python scripts/evaluate.py`
-to regenerate the four-method comparison in `analysis/evidence/step8_comparison.json`.
-The selected correlated-hours method caught 24/44 eligible breaches with 137
-false alerts, versus 23/44 and 260 for naive. Smoothed table caught 31/44 with
-283 false alerts; matched remainder caught 23/44 with 177. These reproduce the
-prior notebook and verify the shared app implementation, not independent accuracy.
-See `analysis/SELECTED_METHOD.md` for pooled F2, workload, calibration, equal
-review budgets and limitations.
-
-The note CSV contains exactly `shift_id,category,note` and one row per original source note.
-The app download uses the same serializer. Original note text, blanks and
-literal `n/a` survive the CSV round trip. A separate reviewer evidence download
-keeps normalized matching text, typo corrections, client-request evidence,
-approval and review flags without adding columns to the submission CSV.
-
-The original `note_validation_review.csv` remains a blank template. The
-completed review is kept locally outside Git; the non-identifying metrics are
-saved under `analysis/evidence/`. All 120 labels matched the current shift IDs
-and exact original note text. Against those human labels, frozen `notes-1.0`
-agreed on 93/100 random notes and 18/20 targeted challenge notes. The nine
-disagreements comprise five approval-only notes labelled
-client-requested by the reviewer but left unknown by the rules, three missed
-spelling variants, and one possible person name fuzzy-matched to `client`.
-These misses and the single-reviewer limitation are disclosed rather than
-tuned away. To reproduce the metrics locally, run
-`python scripts/evaluate_notes.py --review PATH_TO_COMPLETED_REVIEW.csv`.
-The script keeps random and targeted challenge results separate and accepts
-only matching shift IDs and exact original text. It never fills human labels.
-The historical attribution assigns overtime after
-45 recorded hours in chronological shift order for clean completed weeks only.
-It includes no-note hours in the unknown denominator and uses actual shift
-sites. These are associations, not proven causes or billable hours.
-
-Recommendations are generated from forecast alerts, current shift-quality flags
-and uniquely linked notes. Each has a reason and source file/row/key evidence.
-The **Load new data** view shows unresolved current records and unmatched
-notes. Employee details show their alert and record checks; **Why overtime**
-shows site relief patterns and current equipment/client-scope checks. Relief
-patterns mean at least two distinct shifts at one actual site in a Monday–Sunday
-period. A numeric allowance before 55 appears only for usable current recorded
-hours; estimates are shown separately. Actions never infer a roster change,
-future shift, misconduct finding, monetary saving or billing entitlement.
-The first-version overlap and duration policies remain in force. Optional
-sensitivity investigations are listed in `NOTES.md` and have not changed outputs.
-
-## Dashboard walkthrough
-
-1. Open **Act today**. The week and Wednesday cutoff come from the export.
-   Separate counts show breach alerts and employees needing record checks, with
-   their overlap stated explicitly. The default list contains breach alerts.
-2. **Breach alerts** shows every alert in one sortable table, with the employee,
-   registered site, risk, recorded hours, record status and next action.
-   **Records to check** lists every employee needing review and all their specific
-   checks. **All employees** shows the complete register. There is no pagination;
-   site filtering and search narrow the table when needed. Downloads always
-   contain every employee.
-3. Select a table row to open the employee drill-down. Record
-   corrections appear before any remaining-hours allowance. Shifts, notes,
-   estimates and source rows are expandable. Return with **Back to employee list**.
-4. Open **Why overtime** for the historical client-requested / operational /
-   unknown hours split, the largest operational concentration and ranked actual
-   work sites. The unknown share and excluded coverage remain visible. Current
-   supervisor reports and site checks are separate from earlier relief patterns.
-   **How reliable are these reasons?** reads the saved, version-matched demo
-   review metrics and discloses the nine disagreements and review limitations;
-   it does not claim validation of uploaded notes.
-5. Open **Load new data**, select **Replacement upload**, and choose the CSVs
-   from one export. Review the automatically detected week and file checklist,
-   then select **Load dashboard**. Success returns directly to **Act today**.
-   An earlier reporting date is available in the advanced expander. Changed,
-   cleared or rejected inputs invalidate active results. Use **Choose another
-   export** to replace a processed upload; files from separate exports are not
-   combined. Uploads last only for this session.
-6. Download `predictions.csv` from **Act today** and `note_classifications.csv`
-   from **Why overtime**. These do not overwrite the repository's exports.
-
-The employee tables use the available screen width and support scrolling and
-sorting. The drill-down keeps detailed evidence in expanders. This
-presentation uses the selected Step 8 method while retaining the hours, note
-classifications and initial quality policy. The prior correlated-hours replay
-remains reproducible through `jem.evaluation.replay` and the preserved notebook.
+The configured Git remote is `NDM2829/jem-assessment`, branch `main`, entrypoint `app.py`; deployment should use Python 3.10 and root `requirements.txt`. This environment could not resolve the supplied Streamlit or GitHub hosts, so current live access, repository visibility and the latest deployed revision remain **unverified**. The account owner must push these changes, confirm [Community Cloud repository access](https://docs.streamlit.io/deploy/streamlit-community-cloud/get-started/connect-your-github-account) and the Python setting, then check the updated app (or publish it if absent). Community Cloud normally updates an existing app from its GitHub source; [changing Python after deployment requires redeployment](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app/upgrade-python). Open the default dashboard and a replacement upload, then supply working dashboard, repository-access and five-minute video links. No secrets or paid services are required. The unused payroll file is ignored by processing and excluded from the deployment tree; its raw local original and prior Git history have not been altered.

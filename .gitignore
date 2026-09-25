@@ -1,16 +1,51 @@
+# Local Python environments and generated caches
 .venv/
+venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
+
+# Machine/editor state and local agent workspaces
 .DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+/.agents/
+/.codex/
+/.local/
+
+# Credentials and unused payroll extracts (including later upload copies)
 .streamlit/secrets.toml
-data/demo/payroll_details.csv
-uploads/
-tmp_uploads/
+payroll_details.csv
+*.pem
+*.key
 *.env
 .env
 .env.*
+!.env.example
+
+# Local uploads, scratch results and logs
+uploads/
+tmp_uploads/
+*.log
+
+# Working review copies; retain the completed review as reproducible evidence
 note_validation_review_*.csv
-BUILD_PROMPTS.md
+!evidence/note_validation_review_completed.csv
+
+# Personal build prompts and recording preparation
+/BUILD_PROMPTS.md
+/VIDEO_SCRIPT.md
+/recordings/
+
+# Keep submission CSVs, source data, reference notebooks and evaluation evidence.
+# Ignore rules do not remove already tracked files or earlier Git history.

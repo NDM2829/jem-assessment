@@ -23,7 +23,7 @@ def replacement_files(current_monday: date, employees: tuple[str, str]):
         ("employees.csv", employee_csv.encode(), "text/csv"),
         ("sites.csv", b"site_id,site_name\nS1,Replacement Site\n", "text/csv"),
         ("shifts.csv", ("\n".join(shifts) + "\n").encode(), "text/csv"),
-        ("shift_notes.csv", b"shift_id,note\nQ1,replacement note\n", "text/csv"),
+        ("shift_notes.csv", f"shift_id,note\nQ1,{employees[0]} replacement note\n".encode(), "text/csv"),
     ]
 
 
@@ -94,6 +94,9 @@ def test_upload_replacement_and_failure_clear_old_results():
     assert app.selectbox(key="site_filter").value == "All sites"
     assert app.session_state["active_result"].ingestion.reporting.week_start == date(2026, 9, 7)
     assert len(app.session_state["active_result"].queue) == 2
+    assert b"A1 replacement note" in app.session_state["active_result"].note_classifications_csv
+    first_predictions_csv = app.session_state["active_result"].predictions_csv
+    first_notes_csv = app.session_state["active_result"].note_classifications_csv
     app.radio(key="view").set_value("Load new data").run(timeout=30)
     assert app.session_state["active_result"] is not None  # Upload survives navigation.
     app.date_input[0].set_value(date(2026, 9, 2)).run(timeout=30)
@@ -121,6 +124,11 @@ def test_upload_replacement_and_failure_clear_old_results():
     assert result.ingestion.reporting.week_start == date(2026, 9, 14)
     assert set(row.employee_id for row in result.queue) == {"B1", "B2"}
     assert b"A1" not in result.predictions_csv and b"B1" in result.predictions_csv
+    assert b"B1 replacement note" in result.note_classifications_csv
+    assert b"A1 replacement note" not in result.note_classifications_csv
+    assert len(result.note_classifications) == 1
+    assert result.predictions_csv != first_predictions_csv
+    assert result.note_classifications_csv != first_notes_csv
     app.radio(key="view").set_value("Load new data").run(timeout=30)
     app.button(key="new_upload").click().run(timeout=30)
     app.get("file_uploader")[0].set_value(second).run(timeout=30)
