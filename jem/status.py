@@ -16,7 +16,7 @@ class ProjectStatus:
 
 
 CURRENT_STATUS = ProjectStatus(
-    stage="Step 3 — hours and correlated-hours prediction",
+    stage="Step 4 — dashboard around real predictions",
     shell_ready=True,
     ingestion_ready=True,
     predictions_ready=True,

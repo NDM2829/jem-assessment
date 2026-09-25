@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import io
 import json
 import math
 from pathlib import Path
@@ -28,14 +29,20 @@ def validate_forecasts(forecasts: tuple[Forecast, ...], employee_ids: set[str]) 
         raise ValueError("Prediction export contains multiple reporting weeks.")
 
 
-def write_predictions(path: str | Path, forecasts: tuple[Forecast, ...], employee_ids: set[str]) -> None:
+def predictions_csv_bytes(forecasts: tuple[Forecast, ...], employee_ids: set[str]) -> bytes:
+    """Single validated serializer for CLI files and browser downloads."""
     validate_forecasts(forecasts, employee_ids)
-    with Path(path).open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=PREDICTION_COLUMNS)
-        writer.writeheader()
-        for row in sorted(forecasts, key=lambda r: r.employee_id):
-            writer.writerow({"employee_id": row.employee_id, "will_breach": int(row.will_breach),
-                             "risk_score": format(row.risk_score, ".12g")})
+    handle = io.StringIO(newline="")
+    writer = csv.DictWriter(handle, fieldnames=PREDICTION_COLUMNS)
+    writer.writeheader()
+    for row in sorted(forecasts, key=lambda r: r.employee_id):
+        writer.writerow({"employee_id": row.employee_id, "will_breach": int(row.will_breach),
+                         "risk_score": format(row.risk_score, ".12g")})
+    return handle.getvalue().encode("utf-8")
+
+
+def write_predictions(path: str | Path, forecasts: tuple[Forecast, ...], employee_ids: set[str]) -> None:
+    Path(path).write_bytes(predictions_csv_bytes(forecasts, employee_ids))
 
 
 def source_hashes(sources: Mapping[str, Path]) -> dict[str, str]:
