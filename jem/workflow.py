@@ -13,6 +13,8 @@ import tomli
 from jem.exports import predictions_csv_bytes
 from jem.features import Snapshot, build_history, build_snapshot, source_shifts
 from jem.hours import Shift, mask_after_cutoff
+from jem.attribution import AttributionReport, allocate_overtime
+from jem.notes import RULES_VERSION, NoteClassification, classify_bundle, note_classifications_csv_bytes, note_evidence_csv_bytes
 from jem.pipeline import IngestionResult
 from jem.predictors.base import Forecast, PredictorConfig, ProcessingError
 from jem.predictors.correlated_hours import predict
@@ -47,6 +49,10 @@ class ProcessedBundle:
     shifts: tuple[Shift, ...]
     queue: tuple[QueueEntry, ...]
     predictions_csv: bytes
+    note_classifications: tuple[NoteClassification, ...]
+    note_classifications_csv: bytes
+    note_evidence_csv: bytes
+    attribution: AttributionReport
 
 
 def load_policy(path: str | Path) -> Policy:
@@ -77,6 +83,7 @@ def input_fingerprint(sources: Mapping[str, bytes | Path], as_of: date, policy: 
     digest.update(source_fingerprint(sources).encode("ascii"))
     digest.update(as_of.isoformat().encode("ascii"))
     digest.update(policy.digest.encode("ascii"))
+    digest.update(RULES_VERSION.encode("ascii"))
     return digest.hexdigest()
 
 
@@ -119,7 +126,11 @@ def process_bundle(ingestion: IngestionResult, policy: Policy) -> ProcessedBundl
                                 site_id, site.get("site_name", "Unassigned site"), by_forecast[snapshot.employee_id],
                                 snapshot, _review_reasons(snapshot)))
     csv_data = predictions_csv_bytes(forecasts, set(ingestion.employees_by_id))
-    return ProcessedBundle(ingestion, policy, shifts, tuple(queue), csv_data)
+    classified = classify_bundle(ingestion)
+    attribution = allocate_overtime(shifts, ingestion.employees_by_id, ingestion.sites_by_id, week, classified)
+    return ProcessedBundle(ingestion, policy, shifts, tuple(queue), csv_data,
+                           classified, note_classifications_csv_bytes(classified),
+                           note_evidence_csv_bytes(classified), attribution)
 
 
 def filter_queue(processed: ProcessedBundle, primary_site_id: str | None = None) -> tuple[QueueEntry, ...]:
@@ -160,3 +171,20 @@ def employee_shift_rows(processed: ProcessedBundle, employee_id: str) -> tuple[d
                      "Recorded hours": shift.recorded_hours, "Status": status,
                      "Overlap flagged": shift.shift_id in next((entry.snapshot.overlap_shift_ids for entry in processed.queue if entry.employee_id == employee_id), ())})
     return tuple(sorted(rows, key=lambda row: (row["Start date"], row["Shift ID"])))
+
+
+def employee_note_rows(processed: ProcessedBundle, employee_id: str) -> tuple[dict[str, str | int | bool], ...]:
+    """Source notes for this employee's uniquely linked shifts through Wednesday."""
+    week = processed.ingestion.reporting.week_start
+    if week is None:
+        return ()
+    through = week + timedelta(days=3)
+    shift_lookup = {shift.shift_id: shift for shift in processed.shifts if not shift.excluded_reason}
+    rows = []
+    for note in processed.note_classifications:
+        shift = shift_lookup.get(note.linked_shift_id) if note.linked_shift_id else None
+        if shift and shift.employee_id == employee_id and shift.shift_date and week <= shift.shift_date < through:
+            rows.append({"Shift ID": note.shift_id, "Source row": note.source_row or 0,
+                         "Note": note.note, "Category": note.category,
+                         "Approval in note": note.approval_status, "Review": note.needs_review})
+    return tuple(rows)

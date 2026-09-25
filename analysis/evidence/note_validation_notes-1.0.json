@@ -1,0 +1,361 @@
+{
+  "rules_version": "notes-1.0",
+  "splits": {
+    "random_validation": {
+      "accuracy": 0.93,
+      "category_confusion": {
+        "labels": [
+          "client_requested",
+          "absence_cover",
+          "relief_problem",
+          "equipment_failure",
+          "late_handover",
+          "cover_unspecified",
+          "unclear_or_mixed",
+          "no_useful_information"
+        ],
+        "rows": [
+          [
+            10,
+            0,
+            0,
+            0,
+            0,
+            0,
+            5,
+            0
+          ],
+          [
+            0,
+            15,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            20,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            12,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            5,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            5,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            5,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            21
+          ]
+        ]
+      },
+      "cause_pile_confusion": {
+        "labels": [
+          "client_requested",
+          "operational_associated",
+          "unknown"
+        ],
+        "rows": [
+          [
+            10,
+            0,
+            5
+          ],
+          [
+            0,
+            52,
+            2
+          ],
+          [
+            0,
+            0,
+            31
+          ]
+        ]
+      },
+      "expected": 100,
+      "human_filled": 100,
+      "incomplete_review": 0,
+      "matched_reviewed": 100,
+      "per_category": {
+        "absence_cover": {
+          "f1": 0.967741935483871,
+          "precision": 1.0,
+          "recall": 0.9375,
+          "support": 16
+        },
+        "client_requested": {
+          "f1": 0.8,
+          "precision": 1.0,
+          "recall": 0.6666666666666666,
+          "support": 15
+        },
+        "cover_unspecified": {
+          "f1": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 5
+        },
+        "equipment_failure": {
+          "f1": 0.9600000000000001,
+          "precision": 1.0,
+          "recall": 0.9230769230769231,
+          "support": 13
+        },
+        "late_handover": {
+          "f1": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 5
+        },
+        "no_useful_information": {
+          "f1": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 21
+        },
+        "relief_problem": {
+          "f1": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 20
+        },
+        "unclear_or_mixed": {
+          "f1": 0.5882352941176471,
+          "precision": 0.4166666666666667,
+          "recall": 1.0,
+          "support": 5
+        }
+      },
+      "stale_or_ambiguous": 0,
+      "status": "reviewed"
+    },
+    "targeted_challenge": {
+      "accuracy": 0.9,
+      "category_confusion": {
+        "labels": [
+          "client_requested",
+          "absence_cover",
+          "relief_problem",
+          "equipment_failure",
+          "late_handover",
+          "cover_unspecified",
+          "unclear_or_mixed",
+          "no_useful_information"
+        ],
+        "rows": [
+          [
+            5,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            4,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            2,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            4,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "cause_pile_confusion": {
+        "labels": [
+          "client_requested",
+          "operational_associated",
+          "unknown"
+        ],
+        "rows": [
+          [
+            5,
+            0,
+            1
+          ],
+          [
+            0,
+            9,
+            0
+          ],
+          [
+            1,
+            0,
+            4
+          ]
+        ]
+      },
+      "expected": 20,
+      "human_filled": 20,
+      "incomplete_review": 0,
+      "matched_reviewed": 20,
+      "per_category": {
+        "absence_cover": {
+          "f1": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 4
+        },
+        "client_requested": {
+          "f1": 0.8333333333333334,
+          "precision": 0.8333333333333334,
+          "recall": 0.8333333333333334,
+          "support": 6
+        },
+        "cover_unspecified": {
+          "f1": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "support": 0
+        },
+        "equipment_failure": {
+          "f1": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "support": 0
+        },
+        "late_handover": {
+          "f1": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 2
+        },
+        "no_useful_information": {
+          "f1": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "support": 0
+        },
+        "relief_problem": {
+          "f1": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 3
+        },
+        "unclear_or_mixed": {
+          "f1": 0.8000000000000002,
+          "precision": 0.8,
+          "recall": 0.8,
+          "support": 5
+        }
+      },
+      "stale_or_ambiguous": 0,
+      "status": "reviewed"
+    }
+  },
+  "status": "reviewed",
+  "validation_note": "Human review only. A reviewed sample used to revise rules requires a fresh sample for an independent check."
+}

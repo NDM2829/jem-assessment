@@ -9,7 +9,7 @@ import streamlit as st
 from jem.io import demo_sources
 from jem.pipeline import ingest
 from jem.predictors.base import ProcessingError
-from jem.workflow import ProcessedBundle, employee_shift_rows, filter_queue, input_fingerprint, load_policy, process_bundle, queue_counts, source_fingerprint
+from jem.workflow import ProcessedBundle, employee_note_rows, employee_shift_rows, filter_queue, input_fingerprint, load_policy, process_bundle, queue_counts, source_fingerprint
 
 
 ROOT = Path(__file__).resolve().parent
@@ -158,6 +158,13 @@ def _employee_detail(processed: ProcessedBundle, entry) -> None:
             st.dataframe(shift_rows, hide_index=True, width="stretch")
     else:
         st.info("No dated shift record through Wednesday for this employee.")
+    note_rows = employee_note_rows(processed, entry.employee_id)
+    st.markdown("**Supervisor notes linked through Wednesday**")
+    if note_rows:
+        st.dataframe(note_rows, hide_index=True, width="stretch")
+        st.caption("These notes describe recorded shifts. Their categories do not enter this risk score; approval is separate from cause.")
+    else:
+        st.caption("No uniquely linked supervisor note is available through Wednesday for this employee.")
 
 
 def _this_week(processed: ProcessedBundle | None) -> None:
@@ -194,19 +201,49 @@ def _this_week(processed: ProcessedBundle | None) -> None:
         st.write("Target: final Monday–Sunday recorded hours strictly greater than 55. The forecast masks clock-outs after Thursday 00:00 South African local time; record-entry timing cannot be proven from this export. Estimated elapsed hours are kept separate from completed recorded hours.")
         st.write(f"Method: {first.method_version}. Threshold: {first.threshold:.2f}. Policy: {processed.policy.threshold_rule}.")
         st.write("The six-week shared-code replay matched the supplied notebook: correlated hours caught 24 of 44 eligible breaches with 137 false alerts; naive caught 23 with 260. This is exploratory replay on the same supplied export, not independent validation or performance on uncertain outcomes.")
-        st.write("Overlaps are flagged without repair. Missing or future clock-outs remain uncertain. Notes and client-request classification are pending.")
+        st.write("Overlaps are flagged without repair. Missing or future clock-outs remain uncertain. Note categories are separate from the breach predictor. One human review sample found classification disagreements; see NOTES.md for the check and its limits.")
 
 
 def _reasons(processed: ProcessedBundle | None, preview) -> None:
     st.title("Overtime reasons")
-    st.info("Supervisor-note classification and overtime-reason reporting are pending Step 6.")
-    notes_available = preview is not None and "shift_notes.csv" in preview.bundle.row_counts and not any(
-        message.startswith("Note classification unavailable") for message in preview.unavailable_outputs)
-    if notes_available:
-        st.write(f"{preview.bundle.row_counts['shift_notes.csv']} original note rows are present in this bundle. They have not been classified or validated.")
-    elif preview is not None:
-        st.write("No usable shift_notes.csv was supplied, so note reporting is unavailable.")
-    st.caption("Supervisor notes may describe why recorded hours happened. They do not explain the correlated-hours risk score.")
+    if processed is None:
+        st.warning("No processed results are active for the selected inputs. Open Load data & checks to process this bundle.")
+        return
+    if "shift_notes.csv" not in processed.ingestion.bundle.tables or any(
+        message.startswith("Note classification unavailable") for message in processed.ingestion.unavailable_outputs):
+        st.warning("No usable shift_notes.csv was supplied. Note classifications and cause association are unavailable.")
+        return
+    report = processed.attribution
+    st.caption(f"Rules: {report.rules_version}. {len(processed.note_classifications)} source notes classified; original text is preserved in the download.")
+    st.info("A human review sample found classification disagreements; the rules remain unchanged after that review. Hours below are associated with note categories, not proven causes or billable hours. Approval is separate from cause.")
+    st.write(f"Completed clean historical employee-weeks included: **{report.eligible_employee_weeks}**. "
+             f"Excluded historical employee-weeks: **{report.excluded_employee_weeks}**. "
+             "The selected reporting week's partial notes are excluded from these hour totals.")
+    if report.exclusion_reasons:
+        with st.expander("Excluded coverage reasons"):
+            st.dataframe([{"Reason": reason, "Employee-weeks": count} for reason, count in report.exclusion_reasons.items()],
+                         hide_index=True, width="stretch")
+    st.subheader("Historical overtime association")
+    st.dataframe([{"Association": label, "Hours": report.pile_hours[pile],
+                   "Share of all allocated overtime": report.pile_hours[pile] / report.total_overtime_hours if report.total_overtime_hours else 0.0}
+                  for pile, label in (("client_requested", "Client requested"),
+                                      ("operational_associated", "Operational associated"),
+                                      ("unknown", "Unknown or unattributed"))], hide_index=True, width="stretch")
+    st.caption(f"Denominator: {report.total_overtime_hours:.2f} recorded overtime hours in eligible historical weeks, including shifts with no note. Ordinary hours are assigned to the first 45 recorded hours in each employee-week.")
+    st.subheader("Actual shift sites")
+    st.dataframe([{"Site": site.site_name, "Site ID": site.site_id,
+                   "Recorded hours": site.recorded_hours, "Overtime hours": site.total_overtime_hours,
+                   "Client requested": site.client_requested_hours,
+                   "Operational associated": site.operational_associated_hours,
+                   "Unknown or unattributed": site.unknown_hours}
+                  for site in report.site_summaries], hide_index=True, width="stretch")
+    st.download_button("Download note_classifications.csv", data=processed.note_classifications_csv,
+                       file_name="note_classifications.csv", mime="text/csv")
+    with st.expander("Classification evidence for reviewers"):
+        st.caption("Separate audit columns include original and matching text, typo corrections, linked shift, request and approval evidence, review flags and rules version.")
+        st.download_button("Download note evidence CSV", data=processed.note_evidence_csv,
+                           file_name="note_classification_evidence.csv", mime="text/csv")
+    st.caption("This week's notes appear in employee details through Wednesday. They do not explain the correlated-hours risk score.")
 
 
 def main() -> None:

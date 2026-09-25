@@ -12,4 +12,5 @@ tmp_uploads/
 *.env
 .env
 .env.*
+note_validation_review_*.csv
 BUILD_PROMPTS.md

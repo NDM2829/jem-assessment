@@ -13,7 +13,7 @@ from jem.workflow import input_fingerprint, load_policy, process_bundle, source_
 ROOT = Path(__file__).parents[1]
 
 
-def test_input_fingerprint_tracks_source_asof_and_policy():
+def test_input_fingerprint_tracks_source_asof_and_policy(monkeypatch):
     sources = demo_sources(ROOT)
     policy = load_policy(ROOT / "config" / "prediction_policy.toml")
     baseline = input_fingerprint(sources, date(2026, 8, 12), policy)
@@ -23,6 +23,8 @@ def test_input_fingerprint_tracks_source_asof_and_policy():
     changed = dict(sources)
     changed["shift_notes.csv"] = b"shift_id,note\nA,replacement\n"
     assert baseline != input_fingerprint(changed, date(2026, 8, 12), policy)
+    monkeypatch.setattr("jem.workflow.RULES_VERSION", "future-note-rules")
+    assert baseline != input_fingerprint(sources, date(2026, 8, 12), policy)
 
 
 def test_bundled_demo_processes_without_unused_payroll_file(tmp_path):

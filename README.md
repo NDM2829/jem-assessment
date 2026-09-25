@@ -1,10 +1,10 @@
 # Jem overtime early warning
 
 This repository is being built in ordered assessment stages. The current
-deliverable is **Step 5**: deployment preparation for the small Streamlit
-dashboard around the shared correlated-hours predictor. It opens the bundled
-synthetic export by default, accepts a replacement CSV bundle, and offers a
-predictions download.
+deliverable is **Step 6**: note classification and historical overtime
+association, alongside the working correlated-hours dashboard. It opens the
+bundled synthetic export by default, accepts a replacement CSV bundle, and
+offers predictions and note-classification downloads.
 
 The supplied `ASSESSMENT.md` and reference notebooks are preserved as source
 material. The demo export loads through `jem.pipeline.ingest_demo`. The unused
@@ -97,6 +97,8 @@ python -m pytest
 - `jem/evaluation.py`: offline chronological replay and threshold selection
 - `jem/exports.py`, `scripts/export_submission.py`: checked submission CSV and manifest
 - `jem/workflow.py`: session-safe processing, queue facts and current shift evidence
+- `jem/notes.py`, `jem/attribution.py`: versioned note rules and clean historical overtime association
+- `jem/note_evaluation.py`: exact-text human-review metrics, separate by sample split
 - `config/prediction_policy.toml`: predeclared initial method and Step 8 policy
 - `tests/`: focused automated checks
 
@@ -106,10 +108,14 @@ the UI as later stages add it.
 
 ## Current limitations
 
-The dashboard displays current-week hours, predictions and quality flags. Note
-classification and human note validation remain pending in Step 6. The three-model
-comparison remains pending in Step 8; the working correlated-hours predictions
-stay available. `ingest` accepts a replacement mapping of filenames to paths,
+The dashboard displays current-week hours, predictions, quality flags, source
+note classifications and historical overtime association. Human note validation
+has been completed for `notes-1.0` on one sheet prepared without classifier
+labels; the review process itself was not independently observed. Known misses
+are reported in `NOTES.md`, and the rules were left unchanged after review.
+The supplied notebook's AI-reference agreement is not human accuracy. The three-model
+comparison remains pending in Step 8; the working
+correlated-hours predictions stay available. `ingest` accepts a replacement mapping of filenames to paths,
 bytes or browser file objects. Each call is isolated; callers should discard
 old results when a replacement is rejected. Row counts exclude payroll because
 its contents are deliberately unread. The reporting context gives the first
@@ -131,14 +137,40 @@ matches the notebook's 24/44 caught and 137 false alerts for correlated hours,
 versus 23/44 and 260 for the naive comparator. These are exploratory replay
 results on the supplied dataset, not new independent validation.
 
+Run `python scripts/export_notes.py` to regenerate `note_classifications.csv`
+with exactly `shift_id,category,note` and one row per original source note.
+The app download uses the same serializer. Original note text, blanks and
+literal `n/a` survive the CSV round trip. A separate reviewer evidence download
+keeps normalized matching text, typo corrections, client-request evidence,
+approval and review flags without adding columns to the submission CSV.
+
+The original `note_validation_review.csv` remains a blank template. The
+completed review is kept locally outside Git; the non-identifying metrics are
+saved under `analysis/evidence/`. All 120 labels matched the current shift IDs
+and exact original note text. Against those human labels, frozen `notes-1.0`
+agreed on 93/100 random notes and 18/20 targeted challenge notes. The nine
+disagreements comprise five approval-only notes labelled
+client-requested by the reviewer but left unknown by the rules, three missed
+spelling variants, and one possible person name fuzzy-matched to `client`.
+These misses and the single-reviewer limitation are disclosed rather than
+tuned away. To reproduce the metrics locally, run
+`python scripts/evaluate_notes.py --review PATH_TO_COMPLETED_REVIEW.csv`.
+The script keeps random and targeted challenge results separate and accepts
+only matching shift IDs and exact original text. It never fills human labels.
+The historical attribution assigns overtime after
+45 recorded hours in chronological shift order for clean completed weeks only.
+It includes no-note hours in the unknown denominator and uses actual shift
+sites. These are associations, not proven causes or billable hours.
+
 ## Dashboard walkthrough
 
 1. Open **This week**. Review the reporting period, separate breach-alert and
    data-review counts, and filter the employee queue by registered primary site.
 2. Select an employee to see the genuine risk, support/fallback, completed and
    estimated hours, quality flags, and shifts with their actual work sites.
-3. Open **Overtime reasons** to see the pending Step 6 status. No note reason or
-   client-request attribution is claimed yet.
+3. Open **Overtime reasons** to see historical clean-week cause associations,
+   excluded coverage, actual shift sites, and the note-classification download.
+   The `notes-1.0` review result and known misses are documented in `NOTES.md`.
 4. Open **Load data & checks**, choose **Replacement upload** in the sidebar,
    then select one same-format CSV bundle. Check row counts, date coverage and
    structured issues before pressing **Process bundle**. To replace that upload,
