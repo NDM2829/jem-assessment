@@ -7,6 +7,7 @@ from pathlib import Path
 import streamlit as st
 
 from jem.io import demo_sources
+from jem.actions import OPERATIONS_KINDS, REVIEW_KINDS, action_evidence_rows
 from jem.pipeline import ingest
 from jem.predictors.base import ProcessingError
 from jem.workflow import ProcessedBundle, employee_note_rows, employee_shift_rows, filter_queue, input_fingerprint, load_policy, process_bundle, queue_counts, source_fingerprint
@@ -116,6 +117,15 @@ def _load_view(preview, policy, token: str | None, source_id: str | None) -> Non
             st.success(f"Processed {len(processed.queue)} registered employees. Open This week to review predictions.")
     elif st.session_state.active_result is not None and st.session_state.active_token == token:
         st.success("This bundle is processed. Open This week to review predictions.")
+    processed = st.session_state.active_result
+    if processed is not None and st.session_state.active_token == token:
+        review_actions = tuple(action for action in processed.actions if action.kind in REVIEW_KINDS)
+        st.subheader("Unresolved record checks")
+        st.caption("These are record-linked checks for the selected Wednesday snapshot, plus notes that cannot be linked. Overlaps retain suspect recorded sums; no interval repair was applied.")
+        if review_actions:
+            st.dataframe(action_evidence_rows(review_actions), hide_index=True, width="stretch")
+        else:
+            st.caption("No additional record-level review action was found for this selection.")
 
 
 def _queue_table(rows) -> list[dict[str, str]]:
@@ -165,6 +175,19 @@ def _employee_detail(processed: ProcessedBundle, entry) -> None:
         st.caption("These notes describe recorded shifts. Their categories do not enter this risk score; approval is separate from cause.")
     else:
         st.caption("No uniquely linked supervisor note is available through Wednesday for this employee.")
+    employee_actions = tuple(action for action in processed.actions if action.employee_id == entry.employee_id
+                             and action.kind != "unmatched_note")
+    if employee_actions:
+        st.markdown("**Recommended checks from these records**")
+        for action in employee_actions:
+            st.write(f"**{action.kind.replace('_', ' ').title()}:** {action.recommendation} {action.reason}")
+            if action.kind == "breach_alert":
+                if action.remaining_hours_before_55 is None:
+                    st.caption("Remaining-hours allowance: records need confirmation.")
+                else:
+                    st.caption(f"Remaining recorded-hours allowance before 55: {action.remaining_hours_before_55:.2f} h, based on usable shifts in this export. Estimated additions are separate above.")
+        with st.expander("Action source rows"):
+            st.dataframe(action_evidence_rows(employee_actions), hide_index=True, width="stretch")
 
 
 def _this_week(processed: ProcessedBundle | None) -> None:
@@ -237,6 +260,19 @@ def _reasons(processed: ProcessedBundle | None, preview) -> None:
                    "Operational associated": site.operational_associated_hours,
                    "Unknown or unattributed": site.unknown_hours}
                   for site in report.site_summaries], hide_index=True, width="stretch")
+    operational_actions = tuple(action for action in processed.actions if action.kind in OPERATIONS_KINDS)
+    st.subheader("Checks suggested by source notes")
+    st.caption("Relief patterns use distinct shifts at the actual site in one Monday–Sunday period. Current-week note checks stop at Wednesday; earlier completed periods are shown separately from the historical overtime totals above.")
+    if operational_actions:
+        st.dataframe([{"Type": action.kind.replace("_", " ").title(),
+                       "Actual site ID": action.site_id or "", "Period": str(action.period_start),
+                       "Recommendation": action.recommendation, "Reason": action.reason,
+                       "Source records": ", ".join(f"{source.file} row {source.row} ({source.key})" for source in action.sources)}
+                      for action in operational_actions], hide_index=True, width="stretch")
+        with st.expander("Operational action source rows"):
+            st.dataframe(action_evidence_rows(operational_actions), hide_index=True, width="stretch")
+    else:
+        st.caption("No source note met the current operational action rules.")
     st.download_button("Download note_classifications.csv", data=processed.note_classifications_csv,
                        file_name="note_classifications.csv", mime="text/csv")
     with st.expander("Classification evidence for reviewers"):

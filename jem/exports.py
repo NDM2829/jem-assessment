@@ -72,6 +72,6 @@ def write_manifest(path: str | Path, *, forecasts: tuple[Forecast, ...], input_h
         "unavailable_clockout_records": sum(int(row.explanation_facts.get("missing_clockouts", 0)) for row in forecasts),
         "future_clockouts_masked": sum(int(row.explanation_facts.get("future_end_masked", 0)) for row in forecasts),
         "input_sha256": input_hashes,
-        "limitations": "Overlap-affected sums are suspect, not confirmed worked hours or confirmed breaches. Note classifications are a separate output; independent human note validation and the statistical-model comparison remain pending.",
+        "limitations": "Overlap-affected sums are suspect, not confirmed worked hours or confirmed breaches. The notes-1.0 human review found nine disagreements in 120 reviewed notes; see NOTES.md. The three-method statistical comparison remains pending.",
     }
     Path(path).write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")

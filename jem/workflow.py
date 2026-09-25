@@ -14,6 +14,7 @@ from jem.exports import predictions_csv_bytes
 from jem.features import Snapshot, build_history, build_snapshot, source_shifts
 from jem.hours import Shift, mask_after_cutoff
 from jem.attribution import AttributionReport, allocate_overtime
+from jem.actions import Action, build_actions
 from jem.notes import RULES_VERSION, NoteClassification, classify_bundle, note_classifications_csv_bytes, note_evidence_csv_bytes
 from jem.pipeline import IngestionResult
 from jem.predictors.base import Forecast, PredictorConfig, ProcessingError
@@ -53,6 +54,7 @@ class ProcessedBundle:
     note_classifications_csv: bytes
     note_evidence_csv: bytes
     attribution: AttributionReport
+    actions: tuple[Action, ...]
 
 
 def load_policy(path: str | Path) -> Policy:
@@ -128,9 +130,10 @@ def process_bundle(ingestion: IngestionResult, policy: Policy) -> ProcessedBundl
     csv_data = predictions_csv_bytes(forecasts, set(ingestion.employees_by_id))
     classified = classify_bundle(ingestion)
     attribution = allocate_overtime(shifts, ingestion.employees_by_id, ingestion.sites_by_id, week, classified)
+    actions = build_actions(ingestion, shifts, snapshots, forecasts, classified)
     return ProcessedBundle(ingestion, policy, shifts, tuple(queue), csv_data,
                            classified, note_classifications_csv_bytes(classified),
-                           note_evidence_csv_bytes(classified), attribution)
+                           note_evidence_csv_bytes(classified), attribution, actions)
 
 
 def filter_queue(processed: ProcessedBundle, primary_site_id: str | None = None) -> tuple[QueueEntry, ...]:

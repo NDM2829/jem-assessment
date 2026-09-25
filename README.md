@@ -1,8 +1,8 @@
 # Jem overtime early warning
 
 This repository is being built in ordered assessment stages. The current
-deliverable is **Step 6**: note classification and historical overtime
-association, alongside the working correlated-hours dashboard. It opens the
+deliverable is **Step 7**: source-linked manager actions, alongside note
+classification, historical overtime association and the working correlated-hours dashboard. It opens the
 bundled synthetic export by default, accepts a replacement CSV bundle, and
 offers predictions and note-classification downloads.
 
@@ -95,9 +95,10 @@ python -m pytest
 - `jem/hours.py`, `jem/features.py`: strict Wednesday snapshots and separate observed outcomes
 - `jem/predictors/`: correlated-hours method and naive hours comparator
 - `jem/evaluation.py`: offline chronological replay and threshold selection
-- `jem/exports.py`, `scripts/export_submission.py`: checked submission CSV and manifest
+- `jem/exports.py`, `scripts/export_assessment.py`: checked submission CSVs and prediction manifest
 - `jem/workflow.py`: session-safe processing, queue facts and current shift evidence
 - `jem/notes.py`, `jem/attribution.py`: versioned note rules and clean historical overtime association
+- `jem/actions.py`: deterministic recommendations with source file, row and key evidence
 - `jem/note_evaluation.py`: exact-text human-review metrics, separate by sample split
 - `config/prediction_policy.toml`: predeclared initial method and Step 8 policy
 - `tests/`: focused automated checks
@@ -109,7 +110,7 @@ the UI as later stages add it.
 ## Current limitations
 
 The dashboard displays current-week hours, predictions, quality flags, source
-note classifications and historical overtime association. Human note validation
+note classifications, historical overtime association and record-linked actions. Human note validation
 has been completed for `notes-1.0` on one sheet prepared without classifier
 labels; the review process itself was not independently observed. Known misses
 are reported in `NOTES.md`, and the rules were left unchanged after review.
@@ -127,8 +128,9 @@ date and policy changes invalidate it; replacement uploads require processing
 again. Browser downloads are generated in memory and do not change the root
 assessment export.
 
-Run `python scripts/export_submission.py` to regenerate `predictions.csv` and
-`predictions_manifest.json` from the bundled synthetic export. The CSV contains
+Run `python scripts/export_assessment.py` to regenerate both root assessment
+CSVs, `predictions.csv` and `note_classifications.csv`, and the
+`predictions_manifest.json` from the bundled synthetic export. The prediction CSV contains
 exactly `employee_id,will_breach,risk_score`. The manifest records input hashes,
 the reporting week, cutoff, fixed threshold, method version and quality counts.
 The fixed threshold is 0.05, selected from earlier eligible out-of-time
@@ -137,8 +139,7 @@ matches the notebook's 24/44 caught and 137 false alerts for correlated hours,
 versus 23/44 and 260 for the naive comparator. These are exploratory replay
 results on the supplied dataset, not new independent validation.
 
-Run `python scripts/export_notes.py` to regenerate `note_classifications.csv`
-with exactly `shift_id,category,note` and one row per original source note.
+The note CSV contains exactly `shift_id,category,note` and one row per original source note.
 The app download uses the same serializer. Original note text, blanks and
 literal `n/a` survive the CSV round trip. A separate reviewer evidence download
 keeps normalized matching text, typo corrections, client-request evidence,
@@ -162,6 +163,18 @@ The historical attribution assigns overtime after
 It includes no-note hours in the unknown denominator and uses actual shift
 sites. These are associations, not proven causes or billable hours.
 
+Recommendations are generated from forecast alerts, current shift-quality flags
+and uniquely linked notes. Each has a reason and source file/row/key evidence.
+The **Load data & checks** view shows unresolved current records and unmatched
+notes. Employee details show their alert and record checks; **Overtime reasons**
+shows site relief patterns and current equipment/client-scope checks. Relief
+patterns mean at least two distinct shifts at one actual site in a Monday–Sunday
+period. A numeric allowance before 55 appears only for usable current recorded
+hours; estimates are shown separately. Actions never infer a roster change,
+future shift, misconduct finding, monetary saving or billing entitlement.
+The first-version overlap and duration policies remain in force. Optional
+sensitivity investigations are listed in `NOTES.md` and have not changed outputs.
+
 ## Dashboard walkthrough
 
 1. Open **This week**. Review the reporting period, separate breach-alert and
@@ -169,11 +182,12 @@ sites. These are associations, not proven causes or billable hours.
 2. Select an employee to see the genuine risk, support/fallback, completed and
    estimated hours, quality flags, and shifts with their actual work sites.
 3. Open **Overtime reasons** to see historical clean-week cause associations,
-   excluded coverage, actual shift sites, and the note-classification download.
+   excluded coverage, actual shift sites, source-linked note actions and the note-classification download.
    The `notes-1.0` review result and known misses are documented in `NOTES.md`.
 4. Open **Load data & checks**, choose **Replacement upload** in the sidebar,
    then select one same-format CSV bundle. Check row counts, date coverage and
-   structured issues before pressing **Process bundle**. To replace that upload,
+   structured issues before pressing **Process bundle**. Inspect the unresolved
+   record checks after processing. To replace that upload,
    click **Start a new replacement upload** first. Rejected inputs clear results.
 5. Return to **This week** to review the replacement and download its
    `predictions.csv`. This download never overwrites the repository's original

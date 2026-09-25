@@ -35,6 +35,7 @@ def test_demo_views_filter_and_selection_reuse_result():
         ("Employees", "213"), ("Breach alerts", "39"), ("Data review", "28")]
     assert app.session_state["active_result"].predictions_csv == (ROOT / "predictions.csv").read_bytes()
     original = app.session_state["active_result"]
+    assert any(action.sources and action.reason for action in original.actions)
     app.selectbox[0].set_value(app.selectbox[0].options[1]).run(timeout=30)
     assert not app.exception
     assert app.session_state["active_result"] is original
@@ -47,9 +48,11 @@ def test_demo_views_filter_and_selection_reuse_result():
     assert app.session_state["active_result"] is original
     assert app.session_state["active_result"].note_classifications_csv == (ROOT / "note_classifications.csv").read_bytes()
     assert app.session_state["active_result"].attribution.eligible_employee_weeks > 0
+    assert any("Checks suggested by source notes" in item.value for item in app.subheader)
     app.sidebar.radio[0].set_value("Load data & checks").run(timeout=30)
     assert app.title[0].value == "Load data & checks"
     assert len(app.date_input) == 1
+    assert any("Unresolved record checks" in item.value for item in app.subheader)
     assert not app.exception
 
 

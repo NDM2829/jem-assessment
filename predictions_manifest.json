@@ -10,7 +10,7 @@
     "sites.csv": "abbd7c1b650a4e17f188fa52f28dffecfd42c9c125c285197a0b2aa8cbbdcbd6",
     "weekly_summary.csv": "d20a9b25e0de7c0e0a76e126495ddb9c0386ec8e138e70a4d747b2f9c5b12a25"
   },
-  "limitations": "Overlap-affected sums are suspect, not confirmed worked hours or confirmed breaches. Note classifications are a separate output; independent human note validation and the statistical-model comparison remain pending.",
+  "limitations": "Overlap-affected sums are suspect, not confirmed worked hours or confirmed breaches. The notes-1.0 human review found nine disagreements in 120 reviewed notes; see NOTES.md. The three-method statistical comparison remains pending.",
   "method_version": "correlated-hours-1.0",
   "overlap_flagged_employees": 8,
   "policy_version": "1.0",
