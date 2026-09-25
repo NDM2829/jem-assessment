@@ -229,6 +229,19 @@ def _employee_detail(processed: ProcessedBundle, entry) -> None:
     with st.expander("Risk calculation and source evidence"):
         st.write(f"Method: {entry.forecast.method_version}. Historical support: {entry.forecast.support}. "
                  f"Fallback: {entry.forecast.fallback or 'role and shift-pattern peers with personal history'}.")
+        facts = entry.forecast.explanation_facts
+        if processed.policy.selected_method == "correlated_hours":
+            st.write(f"Estimated remaining hours from the historical relationship: "
+                     f"{facts['conditional_remaining_mean']:.2f} h, with {facts['conditional_remaining_sd']:.2f} h spread. "
+                     "The score estimates the chance that these remaining hours would take the week above 55.")
+        elif processed.policy.selected_method == "smoothed_risk_table":
+            st.write(f"Historical table: {facts['cell_breaches']} breaches among {facts['cell_weeks']} "
+                     f"matching clean employee-weeks; broader peer breach rate {facts['peer_breach_rate']:.1%}. "
+                     "The score blends the matching rate with 30 broader peer rows.")
+        elif processed.policy.selected_method == "matched_historical_remaining_hours":
+            st.write(f"Historical comparison: {facts['personal_donors']} personal and {facts['peer_donors']} "
+                     f"peer donor weeks, equivalent to about {facts['effective_donors']:.1f} equally weighted donors. "
+                     "More similar Wednesday weeks count more heavily.")
         st.write("The score uses Wednesday hours and earlier completed employee-weeks. Overlaps retain their suspect sums; no repair is applied.")
         if actions:
             st.dataframe(action_evidence_rows(actions), hide_index=True, width="stretch")
@@ -301,7 +314,7 @@ def _this_week(processed: ProcessedBundle | None) -> None:
     with st.expander("How alerts work"):
         st.write(f"The target is final Monday–Sunday hours strictly greater than 55. Alerts start at a {processed.policy.config.threshold:.0%} risk score to prioritise catching breaches. An alert need not mean a breach is more likely than not; scores are not proven calibrated probabilities.")
         st.write("The forecast uses inputs through Wednesday, masking clock-outs after Thursday 00:00 South African time. Record-entry timing cannot be proven. Estimated hours remain separate from recorded hours.")
-        st.write("On the supplied six-week exploratory replay, correlated hours caught 24 of 44 eligible breaches with 137 false alerts; the naive baseline caught 23 with 260. These are not independent validation results and exclude uncertain outcomes. The Step 8 comparison is pending.")
+        st.write(f"The completed shared-code comparison selected correlated hours by pooled F2. This app is configured for {processed.policy.selected_method.replace('_', ' ')}. On the supplied six-week replay, correlated hours caught 24 of 44 eligible breaches with 137 false alerts; naive caught 23 with 260, the smoothed table 31 with 283, and matched remainder 23 with 177. This reused benchmark is not independent validation and excludes uncertain outcomes from the confusion counts.")
         st.caption(f"Method: {processed.policy.config.method_version}. Threshold policy: {processed.policy.threshold_rule}.")
     st.download_button("Download predictions.csv", processed.predictions_csv, "predictions.csv", "text/csv")
     st.caption("Download includes every registered employee, regardless of filters.")

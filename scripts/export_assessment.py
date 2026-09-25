@@ -43,7 +43,7 @@ def export_assessment(data_dir: Path, output_dir: Path, as_of: str | None = None
                    threshold_rule=deployment["threshold_rule"],
                    threshold_source_weeks=deployment["threshold_source_weeks"],
                    threshold_source_eligible_rows=deployment["threshold_source_eligible_rows"],
-                   reporting_mode=ingestion.reporting.mode)
+                   reporting_mode=ingestion.reporting.mode, selected_method=policy.selected_method)
     return len(forecasts), len(processed.note_classifications)
 
 

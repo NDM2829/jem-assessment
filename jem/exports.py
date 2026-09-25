@@ -52,7 +52,8 @@ def source_hashes(sources: Mapping[str, Path]) -> dict[str, str]:
 
 def write_manifest(path: str | Path, *, forecasts: tuple[Forecast, ...], input_hashes: dict[str, str],
                    policy_version: str, threshold_rule: str, threshold_source_weeks: str,
-                   threshold_source_eligible_rows: int, reporting_mode: str) -> None:
+                   threshold_source_eligible_rows: int, reporting_mode: str,
+                   selected_method: str | None = None) -> None:
     if not forecasts:
         raise ValueError("Cannot write a manifest without forecasts.")
     first = forecasts[0]
@@ -62,6 +63,7 @@ def write_manifest(path: str | Path, *, forecasts: tuple[Forecast, ...], input_h
         "reporting_mode": reporting_mode,
         "forecast_cutoff": "Thursday 00:00 Africa/Johannesburg",
         "method_version": first.method_version,
+        "selected_method": selected_method,
         "policy_version": policy_version,
         "threshold": first.threshold,
         "threshold_rule": threshold_rule,
@@ -72,6 +74,6 @@ def write_manifest(path: str | Path, *, forecasts: tuple[Forecast, ...], input_h
         "unavailable_clockout_records": sum(int(row.explanation_facts.get("missing_clockouts", 0)) for row in forecasts),
         "future_clockouts_masked": sum(int(row.explanation_facts.get("future_end_masked", 0)) for row in forecasts),
         "input_sha256": input_hashes,
-        "limitations": "Overlap-affected sums are suspect, not confirmed worked hours or confirmed breaches. The notes-1.0 human review found nine disagreements in 120 reviewed notes; see NOTES.md. The three-method statistical comparison remains pending.",
+        "limitations": "Overlap-affected sums are suspect, not confirmed worked hours or confirmed breaches. The notes-1.0 human review found nine disagreements in 120 reviewed notes; see NOTES.md. The completed three-candidate comparison is a replay on the supplied export, not independent validation; see analysis/SELECTED_METHOD.md.",
     }
     Path(path).write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")

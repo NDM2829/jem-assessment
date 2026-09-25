@@ -1,0 +1,921 @@
+{
+  "equal_review_budget": {
+    "correlated_hours": [
+      {
+        "FN": 32,
+        "FP": 37,
+        "TP": 12,
+        "all_review_alerts": 60,
+        "recall": 0.2727272727272727,
+        "reviews_per_week": 10,
+        "unknown_outcome_alerts": 11
+      },
+      {
+        "FN": 25,
+        "FP": 77,
+        "TP": 19,
+        "all_review_alerts": 120,
+        "recall": 0.4318181818181818,
+        "reviews_per_week": 20,
+        "unknown_outcome_alerts": 24
+      },
+      {
+        "FN": 21,
+        "FP": 118,
+        "TP": 23,
+        "all_review_alerts": 180,
+        "recall": 0.5227272727272727,
+        "reviews_per_week": 30,
+        "unknown_outcome_alerts": 39
+      },
+      {
+        "FN": 16,
+        "FP": 165,
+        "TP": 28,
+        "all_review_alerts": 240,
+        "recall": 0.6363636363636364,
+        "reviews_per_week": 40,
+        "unknown_outcome_alerts": 47
+      }
+    ],
+    "matched_historical_remaining_hours": [
+      {
+        "FN": 39,
+        "FP": 40,
+        "TP": 5,
+        "all_review_alerts": 60,
+        "recall": 0.11363636363636363,
+        "reviews_per_week": 10,
+        "unknown_outcome_alerts": 15
+      },
+      {
+        "FN": 30,
+        "FP": 78,
+        "TP": 14,
+        "all_review_alerts": 120,
+        "recall": 0.3181818181818182,
+        "reviews_per_week": 20,
+        "unknown_outcome_alerts": 28
+      },
+      {
+        "FN": 27,
+        "FP": 123,
+        "TP": 17,
+        "all_review_alerts": 180,
+        "recall": 0.38636363636363635,
+        "reviews_per_week": 30,
+        "unknown_outcome_alerts": 40
+      },
+      {
+        "FN": 24,
+        "FP": 170,
+        "TP": 20,
+        "all_review_alerts": 240,
+        "recall": 0.45454545454545453,
+        "reviews_per_week": 40,
+        "unknown_outcome_alerts": 50
+      }
+    ],
+    "naive": [
+      {
+        "FN": 41,
+        "FP": 42,
+        "TP": 3,
+        "all_review_alerts": 60,
+        "recall": 0.06818181818181818,
+        "reviews_per_week": 10,
+        "unknown_outcome_alerts": 15
+      },
+      {
+        "FN": 34,
+        "FP": 87,
+        "TP": 10,
+        "all_review_alerts": 120,
+        "recall": 0.22727272727272727,
+        "reviews_per_week": 20,
+        "unknown_outcome_alerts": 23
+      },
+      {
+        "FN": 29,
+        "FP": 130,
+        "TP": 15,
+        "all_review_alerts": 180,
+        "recall": 0.3409090909090909,
+        "reviews_per_week": 30,
+        "unknown_outcome_alerts": 35
+      },
+      {
+        "FN": 25,
+        "FP": 178,
+        "TP": 19,
+        "all_review_alerts": 240,
+        "recall": 0.4318181818181818,
+        "reviews_per_week": 40,
+        "unknown_outcome_alerts": 43
+      }
+    ],
+    "smoothed_risk_table": [
+      {
+        "FN": 36,
+        "FP": 45,
+        "TP": 8,
+        "all_review_alerts": 60,
+        "recall": 0.18181818181818182,
+        "reviews_per_week": 10,
+        "unknown_outcome_alerts": 7
+      },
+      {
+        "FN": 31,
+        "FP": 90,
+        "TP": 13,
+        "all_review_alerts": 120,
+        "recall": 0.29545454545454547,
+        "reviews_per_week": 20,
+        "unknown_outcome_alerts": 17
+      },
+      {
+        "FN": 26,
+        "FP": 129,
+        "TP": 18,
+        "all_review_alerts": 180,
+        "recall": 0.4090909090909091,
+        "reviews_per_week": 30,
+        "unknown_outcome_alerts": 33
+      },
+      {
+        "FN": 22,
+        "FP": 177,
+        "TP": 22,
+        "all_review_alerts": 240,
+        "recall": 0.5,
+        "reviews_per_week": 40,
+        "unknown_outcome_alerts": 41
+      }
+    ]
+  },
+  "excluded_reason_counts": {
+    "missing_clockout": 118,
+    "overlap": 55
+  },
+  "limitations": [
+    "All historical weeks supplied here already informed method design; this shared-code replay is not independent validation.",
+    "Confusion metrics use only clean labelled employee-weeks; excluded rows still count in review workload.",
+    "Scores are not proven calibrated; missing clock-outs and overlaps retain the initial reference quality policy."
+  ],
+  "policy": {
+    "baseline": "naive",
+    "naive_rule": "Wednesday A * 7/3 strictly > 55 hours",
+    "selection": "highest pooled chronological F2; higher recall; fewer FP; fewer all alerts; method name",
+    "statistical_candidates": [
+      "correlated_hours",
+      "smoothed_risk_table",
+      "matched_historical_remaining_hours"
+    ],
+    "weekly_threshold": "earlier eligible out-of-time scores; 0.00..1.00 by 0.01; highest F2; fewer FP; higher threshold"
+  },
+  "probability": {
+    "correlated_hours": {
+      "Brier": 0.03486097042500332,
+      "calibration": [
+        {
+          "band": "[0.000, 0.025]",
+          "breaches": 9,
+          "mean_risk": 0.0065733679120020035,
+          "n": 783,
+          "observed_rate": 0.011494252873563218
+        },
+        {
+          "band": "(0.025, 0.050]",
+          "breaches": 8,
+          "mean_risk": 0.03570262170293046,
+          "n": 142,
+          "observed_rate": 0.056338028169014086
+        },
+        {
+          "band": "(0.050, 0.100]",
+          "breaches": 11,
+          "mean_risk": 0.07004354607021192,
+          "n": 107,
+          "observed_rate": 0.102803738317757
+        },
+        {
+          "band": "(0.100, 0.200]",
+          "breaches": 8,
+          "mean_risk": 0.13601343262597657,
+          "n": 46,
+          "observed_rate": 0.17391304347826086
+        },
+        {
+          "band": "(0.200, 1.000]",
+          "breaches": 8,
+          "mean_risk": 0.3032571111937294,
+          "n": 29,
+          "observed_rate": 0.27586206896551724
+        }
+      ],
+      "mean_risk": 0.02959571175414584,
+      "observed_rate": 0.03974706413730804
+    },
+    "matched_historical_remaining_hours": {
+      "Brier": 0.04144666683822729,
+      "calibration": [
+        {
+          "band": "[0.000, 0.025]",
+          "breaches": 12,
+          "mean_risk": 0.006595562929018187,
+          "n": 787,
+          "observed_rate": 0.015247776365946633
+        },
+        {
+          "band": "(0.025, 0.050]",
+          "breaches": 9,
+          "mean_risk": 0.03498975367168004,
+          "n": 97,
+          "observed_rate": 0.09278350515463918
+        },
+        {
+          "band": "(0.050, 0.100]",
+          "breaches": 6,
+          "mean_risk": 0.07238749184507533,
+          "n": 90,
+          "observed_rate": 0.06666666666666667
+        },
+        {
+          "band": "(0.100, 0.200]",
+          "breaches": 2,
+          "mean_risk": 0.14261856336960582,
+          "n": 49,
+          "observed_rate": 0.04081632653061224
+        },
+        {
+          "band": "(0.200, 1.000]",
+          "breaches": 15,
+          "mean_risk": 0.39306976781192887,
+          "n": 84,
+          "observed_rate": 0.17857142857142858
+        }
+      ],
+      "mean_risk": 0.04977936630411903,
+      "observed_rate": 0.03974706413730804
+    },
+    "smoothed_risk_table": {
+      "Brier": 0.036769298599107755,
+      "calibration": [
+        {
+          "band": "[0.000, 0.025]",
+          "breaches": 12,
+          "mean_risk": 0.017660774795806453,
+          "n": 712,
+          "observed_rate": 0.016853932584269662
+        },
+        {
+          "band": "(0.025, 0.050]",
+          "breaches": 4,
+          "mean_risk": 0.032851921109552706,
+          "n": 118,
+          "observed_rate": 0.03389830508474576
+        },
+        {
+          "band": "(0.050, 0.100]",
+          "breaches": 20,
+          "mean_risk": 0.07081461707673632,
+          "n": 229,
+          "observed_rate": 0.08733624454148471
+        },
+        {
+          "band": "(0.100, 0.200]",
+          "breaches": 8,
+          "mean_risk": 0.1426041815027331,
+          "n": 48,
+          "observed_rate": 0.16666666666666666
+        },
+        {
+          "band": "(0.200, 1.000]",
+          "breaches": 0,
+          "mean_risk": null,
+          "n": 0,
+          "observed_rate": null
+        }
+      ],
+      "mean_risk": 0.03569335715288638,
+      "observed_rate": 0.03974706413730804
+    }
+  },
+  "selected": {
+    "F2_difference_vs_naive": 0.10553842374404432,
+    "FP_difference_vs_naive": -123,
+    "TP_difference_vs_naive": 1,
+    "all_review_alerts_difference_vs_naive": -147,
+    "deployment_threshold": 0.05,
+    "main_F2": 0.3560830860534125,
+    "method": "correlated_hours",
+    "naive_F2": 0.25054466230936817,
+    "threshold_set_for_week": "2026-08-10",
+    "threshold_source_eligible_rows": 1475,
+    "threshold_source_weeks": [
+      "2026-06-15",
+      "2026-06-22",
+      "2026-06-29",
+      "2026-07-06",
+      "2026-07-13",
+      "2026-07-20",
+      "2026-07-27",
+      "2026-08-03"
+    ]
+  },
+  "summary": {
+    "correlated_hours": {
+      "F2": 0.3560830860534125,
+      "FN": 20,
+      "FP": 137,
+      "TP": 24,
+      "all_review_alerts": 200,
+      "breaches": 44,
+      "eligible": 1107,
+      "excluded": 171,
+      "precision": 0.14906832298136646,
+      "recall": 0.5454545454545454,
+      "rows": 1278,
+      "unknown_outcome_alerts": 39
+    },
+    "matched_historical_remaining_hours": {
+      "F2": 0.3058510638297872,
+      "FN": 21,
+      "FP": 177,
+      "TP": 23,
+      "all_review_alerts": 254,
+      "breaches": 44,
+      "eligible": 1107,
+      "excluded": 171,
+      "precision": 0.115,
+      "recall": 0.5227272727272727,
+      "rows": 1278,
+      "unknown_outcome_alerts": 54
+    },
+    "naive": {
+      "F2": 0.25054466230936817,
+      "FN": 21,
+      "FP": 260,
+      "TP": 23,
+      "all_review_alerts": 347,
+      "breaches": 44,
+      "eligible": 1107,
+      "excluded": 171,
+      "precision": 0.0812720848056537,
+      "recall": 0.5227272727272727,
+      "rows": 1278,
+      "unknown_outcome_alerts": 64
+    },
+    "smoothed_risk_table": {
+      "F2": 0.3163265306122449,
+      "FN": 13,
+      "FP": 283,
+      "TP": 31,
+      "all_review_alerts": 381,
+      "breaches": 44,
+      "eligible": 1107,
+      "excluded": 171,
+      "precision": 0.09872611464968153,
+      "recall": 0.7045454545454546,
+      "rows": 1278,
+      "unknown_outcome_alerts": 67
+    }
+  },
+  "weekly": {
+    "correlated_hours": [
+      {
+        "F2": 0.26785714285714285,
+        "FN": 4,
+        "FP": 25,
+        "TP": 3,
+        "all_review_alerts": 34,
+        "breaches": 7,
+        "eligible": 186,
+        "excluded": 27,
+        "precision": 0.10714285714285714,
+        "recall": 0.42857142857142855,
+        "rows": 213,
+        "threshold": 0.06,
+        "unknown_outcome_alerts": 6,
+        "week": "2026-06-29"
+      },
+      {
+        "F2": 0.35714285714285715,
+        "FN": 4,
+        "FP": 11,
+        "TP": 3,
+        "all_review_alerts": 19,
+        "breaches": 7,
+        "eligible": 180,
+        "excluded": 33,
+        "precision": 0.21428571428571427,
+        "recall": 0.42857142857142855,
+        "rows": 213,
+        "threshold": 0.09,
+        "unknown_outcome_alerts": 5,
+        "week": "2026-07-06"
+      },
+      {
+        "F2": 0.4225352112676056,
+        "FN": 4,
+        "FP": 25,
+        "TP": 6,
+        "all_review_alerts": 38,
+        "breaches": 10,
+        "eligible": 192,
+        "excluded": 21,
+        "precision": 0.1935483870967742,
+        "recall": 0.6,
+        "rows": 213,
+        "threshold": 0.05,
+        "unknown_outcome_alerts": 7,
+        "week": "2026-07-13"
+      },
+      {
+        "F2": 0.30303030303030304,
+        "FN": 5,
+        "FP": 26,
+        "TP": 4,
+        "all_review_alerts": 36,
+        "breaches": 9,
+        "eligible": 180,
+        "excluded": 33,
+        "precision": 0.13333333333333333,
+        "recall": 0.4444444444444444,
+        "rows": 213,
+        "threshold": 0.05,
+        "unknown_outcome_alerts": 6,
+        "week": "2026-07-20"
+      },
+      {
+        "F2": 0.3508771929824561,
+        "FN": 2,
+        "FP": 29,
+        "TP": 4,
+        "all_review_alerts": 39,
+        "breaches": 6,
+        "eligible": 193,
+        "excluded": 20,
+        "precision": 0.12121212121212122,
+        "recall": 0.6666666666666666,
+        "rows": 213,
+        "threshold": 0.05,
+        "unknown_outcome_alerts": 6,
+        "week": "2026-07-27"
+      },
+      {
+        "F2": 0.4444444444444444,
+        "FN": 1,
+        "FP": 21,
+        "TP": 4,
+        "all_review_alerts": 34,
+        "breaches": 5,
+        "eligible": 176,
+        "excluded": 37,
+        "precision": 0.16,
+        "recall": 0.8,
+        "rows": 213,
+        "threshold": 0.05,
+        "unknown_outcome_alerts": 9,
+        "week": "2026-08-03"
+      }
+    ],
+    "matched_historical_remaining_hours": [
+      {
+        "F2": 0.2459016393442623,
+        "FN": 4,
+        "FP": 30,
+        "TP": 3,
+        "all_review_alerts": 38,
+        "breaches": 7,
+        "eligible": 186,
+        "excluded": 27,
+        "precision": 0.09090909090909091,
+        "recall": 0.42857142857142855,
+        "rows": 213,
+        "threshold": 0.09,
+        "unknown_outcome_alerts": 5,
+        "week": "2026-06-29"
+      },
+      {
+        "F2": 0.29411764705882354,
+        "FN": 4,
+        "FP": 20,
+        "TP": 3,
+        "all_review_alerts": 29,
+        "breaches": 7,
+        "eligible": 180,
+        "excluded": 33,
+        "precision": 0.13043478260869565,
+        "recall": 0.42857142857142855,
+        "rows": 213,
+        "threshold": 0.09,
+        "unknown_outcome_alerts": 6,
+        "week": "2026-07-06"
+      },
+      {
+        "F2": 0.3125,
+        "FN": 6,
+        "FP": 20,
+        "TP": 4,
+        "all_review_alerts": 31,
+        "breaches": 10,
+        "eligible": 192,
+        "excluded": 21,
+        "precision": 0.16666666666666666,
+        "recall": 0.4,
+        "rows": 213,
+        "threshold": 0.09,
+        "unknown_outcome_alerts": 7,
+        "week": "2026-07-13"
+      },
+      {
+        "F2": 0.40540540540540543,
+        "FN": 3,
+        "FP": 32,
+        "TP": 6,
+        "all_review_alerts": 54,
+        "breaches": 9,
+        "eligible": 180,
+        "excluded": 33,
+        "precision": 0.15789473684210525,
+        "recall": 0.6666666666666666,
+        "rows": 213,
+        "threshold": 0.04,
+        "unknown_outcome_alerts": 16,
+        "week": "2026-07-20"
+      },
+      {
+        "F2": 0.2857142857142857,
+        "FN": 2,
+        "FP": 42,
+        "TP": 4,
+        "all_review_alerts": 51,
+        "breaches": 6,
+        "eligible": 193,
+        "excluded": 20,
+        "precision": 0.08695652173913043,
+        "recall": 0.6666666666666666,
+        "rows": 213,
+        "threshold": 0.04,
+        "unknown_outcome_alerts": 5,
+        "week": "2026-07-27"
+      },
+      {
+        "F2": 0.26785714285714285,
+        "FN": 2,
+        "FP": 33,
+        "TP": 3,
+        "all_review_alerts": 51,
+        "breaches": 5,
+        "eligible": 176,
+        "excluded": 37,
+        "precision": 0.08333333333333333,
+        "recall": 0.6,
+        "rows": 213,
+        "threshold": 0.04,
+        "unknown_outcome_alerts": 15,
+        "week": "2026-08-03"
+      }
+    ],
+    "naive": [
+      {
+        "F2": 0.1875,
+        "FN": 4,
+        "FP": 49,
+        "TP": 3,
+        "all_review_alerts": 61,
+        "breaches": 7,
+        "eligible": 186,
+        "excluded": 27,
+        "precision": 0.057692307692307696,
+        "recall": 0.42857142857142855,
+        "rows": 213,
+        "threshold": 55.0,
+        "unknown_outcome_alerts": 9,
+        "week": "2026-06-29"
+      },
+      {
+        "F2": 0.3424657534246575,
+        "FN": 2,
+        "FP": 40,
+        "TP": 5,
+        "all_review_alerts": 61,
+        "breaches": 7,
+        "eligible": 180,
+        "excluded": 33,
+        "precision": 0.1111111111111111,
+        "recall": 0.7142857142857143,
+        "rows": 213,
+        "threshold": 55.0,
+        "unknown_outcome_alerts": 16,
+        "week": "2026-07-06"
+      },
+      {
+        "F2": 0.40229885057471265,
+        "FN": 3,
+        "FP": 40,
+        "TP": 7,
+        "all_review_alerts": 56,
+        "breaches": 10,
+        "eligible": 192,
+        "excluded": 21,
+        "precision": 0.14893617021276595,
+        "recall": 0.7,
+        "rows": 213,
+        "threshold": 55.0,
+        "unknown_outcome_alerts": 9,
+        "week": "2026-07-13"
+      },
+      {
+        "F2": 0.25,
+        "FN": 5,
+        "FP": 40,
+        "TP": 4,
+        "all_review_alerts": 59,
+        "breaches": 9,
+        "eligible": 180,
+        "excluded": 33,
+        "precision": 0.09090909090909091,
+        "recall": 0.4444444444444444,
+        "rows": 213,
+        "threshold": 55.0,
+        "unknown_outcome_alerts": 15,
+        "week": "2026-07-20"
+      },
+      {
+        "F2": 0.136986301369863,
+        "FN": 4,
+        "FP": 47,
+        "TP": 2,
+        "all_review_alerts": 53,
+        "breaches": 6,
+        "eligible": 193,
+        "excluded": 20,
+        "precision": 0.04081632653061224,
+        "recall": 0.3333333333333333,
+        "rows": 213,
+        "threshold": 55.0,
+        "unknown_outcome_alerts": 4,
+        "week": "2026-07-27"
+      },
+      {
+        "F2": 0.15151515151515152,
+        "FN": 3,
+        "FP": 44,
+        "TP": 2,
+        "all_review_alerts": 57,
+        "breaches": 5,
+        "eligible": 176,
+        "excluded": 37,
+        "precision": 0.043478260869565216,
+        "recall": 0.4,
+        "rows": 213,
+        "threshold": 55.0,
+        "unknown_outcome_alerts": 11,
+        "week": "2026-08-03"
+      }
+    ],
+    "smoothed_risk_table": [
+      {
+        "F2": 0.189873417721519,
+        "FN": 4,
+        "FP": 48,
+        "TP": 3,
+        "all_review_alerts": 58,
+        "breaches": 7,
+        "eligible": 186,
+        "excluded": 27,
+        "precision": 0.058823529411764705,
+        "recall": 0.42857142857142855,
+        "rows": 213,
+        "threshold": 0.04,
+        "unknown_outcome_alerts": 7,
+        "week": "2026-06-29"
+      },
+      {
+        "F2": 0.3614457831325301,
+        "FN": 1,
+        "FP": 49,
+        "TP": 6,
+        "all_review_alerts": 74,
+        "breaches": 7,
+        "eligible": 180,
+        "excluded": 33,
+        "precision": 0.10909090909090909,
+        "recall": 0.8571428571428571,
+        "rows": 213,
+        "threshold": 0.03,
+        "unknown_outcome_alerts": 19,
+        "week": "2026-07-06"
+      },
+      {
+        "F2": 0.3763440860215054,
+        "FN": 3,
+        "FP": 46,
+        "TP": 7,
+        "all_review_alerts": 62,
+        "breaches": 10,
+        "eligible": 192,
+        "excluded": 21,
+        "precision": 0.1320754716981132,
+        "recall": 0.7,
+        "rows": 213,
+        "threshold": 0.03,
+        "unknown_outcome_alerts": 9,
+        "week": "2026-07-13"
+      },
+      {
+        "F2": 0.42168674698795183,
+        "FN": 2,
+        "FP": 40,
+        "TP": 7,
+        "all_review_alerts": 61,
+        "breaches": 9,
+        "eligible": 180,
+        "excluded": 33,
+        "precision": 0.14893617021276595,
+        "recall": 0.7777777777777778,
+        "rows": 213,
+        "threshold": 0.04,
+        "unknown_outcome_alerts": 14,
+        "week": "2026-07-20"
+      },
+      {
+        "F2": 0.2564102564102564,
+        "FN": 2,
+        "FP": 50,
+        "TP": 4,
+        "all_review_alerts": 60,
+        "breaches": 6,
+        "eligible": 193,
+        "excluded": 20,
+        "precision": 0.07407407407407407,
+        "recall": 0.6666666666666666,
+        "rows": 213,
+        "threshold": 0.04,
+        "unknown_outcome_alerts": 6,
+        "week": "2026-07-27"
+      },
+      {
+        "F2": 0.2702702702702703,
+        "FN": 1,
+        "FP": 50,
+        "TP": 4,
+        "all_review_alerts": 66,
+        "breaches": 5,
+        "eligible": 176,
+        "excluded": 37,
+        "precision": 0.07407407407407407,
+        "recall": 0.8,
+        "rows": 213,
+        "threshold": 0.04,
+        "unknown_outcome_alerts": 12,
+        "week": "2026-08-03"
+      }
+    ]
+  },
+  "weekly_thresholds": {
+    "correlated_hours": [
+      {
+        "earlier_eligible_rows": 368,
+        "last_training_week": "2026-06-22",
+        "threshold": 0.06,
+        "week": "2026-06-29"
+      },
+      {
+        "earlier_eligible_rows": 554,
+        "last_training_week": "2026-06-29",
+        "threshold": 0.09,
+        "week": "2026-07-06"
+      },
+      {
+        "earlier_eligible_rows": 734,
+        "last_training_week": "2026-07-06",
+        "threshold": 0.05,
+        "week": "2026-07-13"
+      },
+      {
+        "earlier_eligible_rows": 926,
+        "last_training_week": "2026-07-13",
+        "threshold": 0.05,
+        "week": "2026-07-20"
+      },
+      {
+        "earlier_eligible_rows": 1106,
+        "last_training_week": "2026-07-20",
+        "threshold": 0.05,
+        "week": "2026-07-27"
+      },
+      {
+        "earlier_eligible_rows": 1299,
+        "last_training_week": "2026-07-27",
+        "threshold": 0.05,
+        "week": "2026-08-03"
+      }
+    ],
+    "matched_historical_remaining_hours": [
+      {
+        "earlier_eligible_rows": 368,
+        "last_training_week": "2026-06-22",
+        "threshold": 0.09,
+        "week": "2026-06-29"
+      },
+      {
+        "earlier_eligible_rows": 554,
+        "last_training_week": "2026-06-29",
+        "threshold": 0.09,
+        "week": "2026-07-06"
+      },
+      {
+        "earlier_eligible_rows": 734,
+        "last_training_week": "2026-07-06",
+        "threshold": 0.09,
+        "week": "2026-07-13"
+      },
+      {
+        "earlier_eligible_rows": 926,
+        "last_training_week": "2026-07-13",
+        "threshold": 0.04,
+        "week": "2026-07-20"
+      },
+      {
+        "earlier_eligible_rows": 1106,
+        "last_training_week": "2026-07-20",
+        "threshold": 0.04,
+        "week": "2026-07-27"
+      },
+      {
+        "earlier_eligible_rows": 1299,
+        "last_training_week": "2026-07-27",
+        "threshold": 0.04,
+        "week": "2026-08-03"
+      }
+    ],
+    "smoothed_risk_table": [
+      {
+        "earlier_eligible_rows": 368,
+        "last_training_week": "2026-06-22",
+        "threshold": 0.04,
+        "week": "2026-06-29"
+      },
+      {
+        "earlier_eligible_rows": 554,
+        "last_training_week": "2026-06-29",
+        "threshold": 0.03,
+        "week": "2026-07-06"
+      },
+      {
+        "earlier_eligible_rows": 734,
+        "last_training_week": "2026-07-06",
+        "threshold": 0.03,
+        "week": "2026-07-13"
+      },
+      {
+        "earlier_eligible_rows": 926,
+        "last_training_week": "2026-07-13",
+        "threshold": 0.04,
+        "week": "2026-07-20"
+      },
+      {
+        "earlier_eligible_rows": 1106,
+        "last_training_week": "2026-07-20",
+        "threshold": 0.04,
+        "week": "2026-07-27"
+      },
+      {
+        "earlier_eligible_rows": 1299,
+        "last_training_week": "2026-07-27",
+        "threshold": 0.04,
+        "week": "2026-08-03"
+      }
+    ]
+  },
+  "weeks": {
+    "all_completed": [
+      "2026-06-08",
+      "2026-06-15",
+      "2026-06-22",
+      "2026-06-29",
+      "2026-07-06",
+      "2026-07-13",
+      "2026-07-20",
+      "2026-07-27",
+      "2026-08-03"
+    ],
+    "current": "2026-08-10",
+    "main": [
+      "2026-06-29",
+      "2026-07-06",
+      "2026-07-13",
+      "2026-07-20",
+      "2026-07-27",
+      "2026-08-03"
+    ],
+    "reference_only": "2026-06-08",
+    "threshold_seeds": [
+      "2026-06-15",
+      "2026-06-22"
+    ]
+  }
+}

@@ -1,8 +1,7 @@
 # Jem overtime early warning
 
 This repository is being built in ordered assessment stages. The current
-deliverable is **Step 7**: source-linked manager actions, alongside note
-classification, historical overtime association and the working correlated-hours dashboard. It opens the
+deliverable is **Step 8**: the predeclared four-approach comparison and selected correlated-hours deployment, alongside source-linked manager actions, note classification and historical overtime association. It opens the
 bundled synthetic export by default, accepts a replacement CSV bundle, and
 offers predictions and note-classification downloads.
 
@@ -93,14 +92,14 @@ python -m pytest
 - `jem/io.py`: shared lossless CSV reader for demo paths, upload objects and export scripts
 - `jem/pipeline.py`: validation, safe unique-ID lookups and reporting context
 - `jem/hours.py`, `jem/features.py`: strict Wednesday snapshots and separate observed outcomes
-- `jem/predictors/`: correlated-hours method and naive hours comparator
-- `jem/evaluation.py`: offline chronological replay and threshold selection
+- `jem/predictors/`: correlated hours, smoothed risk table, matched remainder and naive hours comparator
+- `jem/evaluation.py`, `jem/comparison.py`: chronological threshold selection and common four-approach replay
 - `jem/exports.py`, `scripts/export_assessment.py`: checked submission CSVs and prediction manifest
 - `jem/workflow.py`: session-safe processing, queue facts and current shift evidence
 - `jem/notes.py`, `jem/attribution.py`: versioned note rules and clean historical overtime association
 - `jem/actions.py`: deterministic recommendations with source file, row and key evidence
 - `jem/note_evaluation.py`: exact-text human-review metrics, separate by sample split
-- `config/prediction_policy.toml`: predeclared initial method and Step 8 policy
+- `config/prediction_policy.toml`: predeclared selection policy and frozen selected deployment
 - `tests/`: focused automated checks
 
 There is no React app, API server, database, container, chatbot, authentication
@@ -114,9 +113,7 @@ note classifications, historical overtime association and record-linked actions.
 has been completed for `notes-1.0` on one sheet prepared without classifier
 labels; the review process itself was not independently observed. Known misses
 are reported in `NOTES.md`, and the rules were left unchanged after review.
-The supplied notebook's AI-reference agreement is not human accuracy. The three-model
-comparison remains pending in Step 8; the working
-correlated-hours predictions stay available. `ingest` accepts a replacement mapping of filenames to paths,
+The supplied notebook's AI-reference agreement is not human accuracy. The completed Step 8 comparison selected correlated hours by the predeclared pooled F2 rule. Its 0.05 threshold remains fixed; `analysis/SELECTED_METHOD.md` gives the evidence and limits. `ingest` accepts a replacement mapping of filenames to paths,
 bytes or browser file objects. Each call is isolated; callers should discard
 old results when a replacement is rejected. Row counts exclude payroll because
 its contents are deliberately unread. The reporting context gives the first
@@ -133,11 +130,15 @@ CSVs, `predictions.csv` and `note_classifications.csv`, and the
 `predictions_manifest.json` from the bundled synthetic export. The prediction CSV contains
 exactly `employee_id,will_breach,risk_score`. The manifest records input hashes,
 the reporting week, cutoff, fixed threshold, method version and quality counts.
-The fixed threshold is 0.05, selected from earlier eligible out-of-time
-forecasts under the predeclared F2 grid rule. The six-week shared-code replay
-matches the notebook's 24/44 caught and 137 false alerts for correlated hours,
-versus 23/44 and 260 for the naive comparator. These are exploratory replay
-results on the supplied dataset, not new independent validation.
+The fixed threshold is 0.05, re-derived from 1,475 earlier eligible out-of-time
+forecasts before the original current-week cutoff. Run `python scripts/evaluate.py`
+to regenerate the four-method comparison in `analysis/evidence/step8_comparison.json`.
+The selected correlated-hours method caught 24/44 eligible breaches with 137
+false alerts, versus 23/44 and 260 for naive. Smoothed table caught 31/44 with
+283 false alerts; matched remainder caught 23/44 with 177. These reproduce the
+prior notebook and verify the shared app implementation, not independent accuracy.
+See `analysis/SELECTED_METHOD.md` for pooled F2, workload, calibration, equal
+review budgets and limitations.
 
 The note CSV contains exactly `shift_id,category,note` and one row per original source note.
 The app download uses the same serializer. Original note text, blanks and
@@ -208,5 +209,6 @@ sensitivity investigations are listed in `NOTES.md` and have not changed outputs
 
 The employee tables use the available screen width and support scrolling and
 sorting. The drill-down keeps detailed evidence in expanders. This
-presentation update retains the Step 7 predictor, classifications, hours and
-quality policy; it does not implement the pending Step 8 comparison.
+presentation uses the selected Step 8 method while retaining the hours, note
+classifications and initial quality policy. The prior correlated-hours replay
+remains reproducible through `jem.evaluation.replay` and the preserved notebook.

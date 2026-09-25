@@ -18,7 +18,16 @@ from jem.actions import Action, OPERATIONS_KINDS, REVIEW_KINDS, build_actions
 from jem.notes import RULES_VERSION, NoteClassification, classify_bundle, note_classifications_csv_bytes, note_evidence_csv_bytes
 from jem.pipeline import IngestionResult
 from jem.predictors.base import Forecast, PredictorConfig, ProcessingError
-from jem.predictors.correlated_hours import predict
+from jem.predictors.correlated_hours import predict as correlated_predict
+from jem.predictors.smoothed_risk_table import predict as table_predict
+from jem.predictors.matched_historical_remaining_hours import predict as matched_predict
+
+
+SELECTED_PREDICTORS = {
+    "correlated_hours": correlated_predict,
+    "smoothed_risk_table": table_predict,
+    "matched_historical_remaining_hours": matched_predict,
+}
 
 
 @dataclass(frozen=True)
@@ -26,6 +35,7 @@ class Policy:
     config: PredictorConfig
     digest: str
     threshold_rule: str
+    selected_method: str = "correlated_hours"
 
 
 @dataclass(frozen=True)
@@ -61,13 +71,20 @@ def load_policy(path: str | Path) -> Policy:
     data = Path(path).read_bytes()
     document = tomli.loads(data.decode("utf-8"))
     if document["initial_method"] != "correlated_hours":
-        raise ProcessingError("The selected prediction method is not implemented in this stage.")
+        raise ProcessingError("The predeclared initial method must remain correlated hours.")
     deployment = document["deployment"]
+    selected = deployment.get("selected_method", document["initial_method"])
+    if selected not in SELECTED_PREDICTORS:
+        raise ProcessingError("The selected statistical prediction method is unavailable.")
+    prefixes = {"correlated_hours": "correlated-hours-", "smoothed_risk_table": "smoothed-risk-table-",
+                "matched_historical_remaining_hours": "matched-remainder-"}
+    if not deployment["method_version"].startswith(prefixes[selected]):
+        raise ProcessingError("The configured method version does not match the selected predictor.")
     config = PredictorConfig(document["policy_version"], deployment["method_version"],
                              deployment["threshold"], deployment["personal_prior_weeks"],
                              deployment["peer_minimum_weeks"], deployment["variance_floor"],
                              deployment["correlation_cap"])
-    return Policy(config, hashlib.sha256(data).hexdigest(), deployment["threshold_rule"])
+    return Policy(config, hashlib.sha256(data).hexdigest(), deployment["threshold_rule"], selected)
 
 
 def source_fingerprint(sources: Mapping[str, bytes | Path]) -> str:
@@ -117,7 +134,7 @@ def process_bundle(ingestion: IngestionResult, policy: Policy) -> ProcessedBundl
     week = ingestion.reporting.week_start
     history = build_history(shifts, ingestion.employees_by_id, week)
     snapshots = build_snapshot(shifts, ingestion.employees_by_id, week)
-    forecasts = predict(snapshots, history, policy.config)
+    forecasts = SELECTED_PREDICTORS[policy.selected_method](snapshots, history, policy.config)
     by_forecast = {row.employee_id: row for row in forecasts}
     queue = []
     for snapshot in snapshots:

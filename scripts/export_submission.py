@@ -16,12 +16,12 @@ from jem.exports import source_hashes, write_manifest, write_predictions
 from jem.features import build_history, build_snapshot, source_shifts
 from jem.io import demo_sources
 from jem.pipeline import ingest
-from jem.predictors.base import PredictorConfig, ProcessingError
-from jem.predictors.correlated_hours import predict
+from jem.predictors.base import ProcessingError
+from jem.workflow import SELECTED_PREDICTORS, load_policy
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Export Stage 3 breach predictions")
+    parser = argparse.ArgumentParser(description="Export selected-method breach predictions")
     parser.add_argument("--data-dir", type=Path, default=ROOT / "data" / "demo")
     parser.add_argument("--output-dir", type=Path, default=ROOT)
     parser.add_argument("--as-of", default=None, help="Selected reporting date, YYYY-MM-DD")
@@ -31,30 +31,28 @@ def main() -> None:
                                "public_holidays.csv", "weekly_summary.csv", "payroll_details.csv")
         if (path := args.data_dir / name).is_file()
     }
+    sources.pop("payroll_details.csv", None)
     result = ingest(sources, as_of=args.as_of)
     if not result.accepted:
         raise ProcessingError("Input bundle rejected; inspect structured ingestion issues before exporting.")
     if result.reporting.mode == "before_wednesday":
         raise ProcessingError("Export ends before Wednesday; supply records through Wednesday for this forecast.")
+    policy = load_policy(ROOT / "config" / "prediction_policy.toml")
     with (ROOT / "config" / "prediction_policy.toml").open("rb") as handle:
-        policy = tomli.load(handle)
-    deployment = policy["deployment"]
-    config = PredictorConfig(policy["policy_version"], deployment["method_version"], deployment["threshold"],
-                             deployment["personal_prior_weeks"], deployment["peer_minimum_weeks"],
-                             deployment["variance_floor"], deployment["correlation_cap"])
+        deployment = tomli.load(handle)["deployment"]
     shifts = source_shifts(result)
     week = result.reporting.week_start
     history = build_history(shifts, result.employees_by_id, week)
     snapshot = build_snapshot(shifts, result.employees_by_id, week)
-    forecasts = predict(snapshot, history, config)
+    forecasts = SELECTED_PREDICTORS[policy.selected_method](snapshot, history, policy.config)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     write_predictions(args.output_dir / "predictions.csv", forecasts, set(result.employees_by_id))
     write_manifest(args.output_dir / "predictions_manifest.json", forecasts=forecasts,
-                   input_hashes=source_hashes(sources), policy_version=config.policy_version,
+                   input_hashes=source_hashes(sources), policy_version=policy.config.policy_version,
                    threshold_rule=deployment["threshold_rule"],
                    threshold_source_weeks=deployment["threshold_source_weeks"],
                    threshold_source_eligible_rows=deployment["threshold_source_eligible_rows"],
-                   reporting_mode=result.reporting.mode)
+                   reporting_mode=result.reporting.mode, selected_method=policy.selected_method)
     print(f"Exported {len(forecasts)} predictions for {week} ({result.reporting.mode}).")
 
 

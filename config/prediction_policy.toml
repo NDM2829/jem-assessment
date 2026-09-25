@@ -28,6 +28,9 @@ show_baseline_even_if_disappointing = true
 show_limitations = true
 
 [deployment]
+selected_method = "correlated_hours"
+selected_at_stage = 8
+selection_evidence = "analysis/evidence/step8_comparison.json"
 method_version = "correlated-hours-1.0"
 threshold = 0.05
 threshold_rule = "earlier eligible out-of-time forecasts; grid 0.00..1.00 by 0.01; max F2, then fewer false alerts, then higher threshold"
